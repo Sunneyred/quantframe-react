@@ -1,6 +1,8 @@
 name: Void Trader Build
 on:
   push:
+    branches:
+      - void-trader
     tags:
       - "v*"
   workflow_dispatch:
@@ -42,7 +44,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ startsWith(github.ref, 'refs/tags/') && 'v__VERSION__' || '' }}
+          tagName: v__VERSION__
           releaseName: "Void Trader v__VERSION__"
           releaseBody: "Void Trader — a personal build of Quantframe (GPL-3.0). Download the -setup.exe below."
           releaseDraft: false
