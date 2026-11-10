@@ -150,6 +150,20 @@ export const WTBItemAccordion = ({ form }: WTBItemAccordionProps) => {
           radius="md"
           {...form.getInputProps(getFieldPath("min_listings_below"))}
         />
+        <NumberInput
+          label="Outbid by (plat)"
+          min={-1}
+          rightSection={<TooltipIcon label="Void Trader bids this many plat above the top buyer, but only when the flip still clears your profit and ROI targets." />}
+          radius="md"
+          {...form.getInputProps(getFieldPath("outbid_step"))}
+        />
+        <NumberInput
+          label="Minimum ROI (%)"
+          min={-1}
+          rightSection={<TooltipIcon label="Skip flips whose expected resale profit is below this percent of the buy price. -1 turns this off." />}
+          radius="md"
+          {...form.getInputProps(getFieldPath("min_roi_percentage"))}
+        />
       </Group>
     </Box>
   );

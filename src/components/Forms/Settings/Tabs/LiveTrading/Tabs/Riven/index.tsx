@@ -65,6 +65,25 @@ export const RivenPanel = ({ form }: RivenPanelProps) => {
           }
           {...form.getInputProps(getFieldPath("wts.use_predict"), { type: "checkbox" })}
         />
+        <Switch
+          label="Match rivens by stats"
+          description="Price against rivens with the same positive stats instead of every riven for the weapon"
+          {...form.getInputProps(getFieldPath("wts.auto_match_stats"), { type: "checkbox" })}
+        />
+        <NumberInput
+          label="Min stat-matched comparables"
+          min={1}
+          rightSection={<TooltipIcon label="How many similar rivens must be listed before trusting a stat-matched price. Otherwise it falls back to all rivens for the weapon." />}
+          radius="md"
+          {...form.getInputProps(getFieldPath("wts.min_comparables"))}
+        />
+        <NumberInput
+          label="Riven undercut (plat)"
+          min={0}
+          rightSection={<TooltipIcon label="Plat to list below the cheapest comparable riven." />}
+          radius="md"
+          {...form.getInputProps(getFieldPath("wts.undercut_step"))}
+        />
       </Group>
     </Box>
   );

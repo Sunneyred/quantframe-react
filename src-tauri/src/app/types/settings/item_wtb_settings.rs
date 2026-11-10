@@ -14,6 +14,12 @@ pub struct ItemWtbSettings {
     pub max_stock_quantity: i64,
     pub max_price_drop: i64,
     pub min_listings_below: i64,
+    /// Void Trader: plat to outbid the highest buyer by, when the margin still clears the thresholds.
+    #[serde(default = "vt_wtb_outbid")]
+    pub outbid_step: i64,
+    /// Void Trader: minimum expected return on the buy price, in percent (-1 = off).
+    #[serde(default = "vt_wtb_min_roi")]
+    pub min_roi_percentage: i64,
 }
 
 impl Default for ItemWtbSettings {
@@ -31,6 +37,11 @@ impl Default for ItemWtbSettings {
             max_stock_quantity: -1,
             max_price_drop: -1,
             min_listings_below: -1,
+            outbid_step: vt_wtb_outbid(),
+            min_roi_percentage: vt_wtb_min_roi(),
         }
     }
 }
+
+fn vt_wtb_outbid() -> i64 { 1 }
+fn vt_wtb_min_roi() -> i64 { 15 }

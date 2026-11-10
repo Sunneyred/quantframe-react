@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="space" cx="50%" cy="45%" r="70%">
+      <stop offset="0%" stop-color="#1b1446"/>
+      <stop offset="55%" stop-color="#0a0820"/>
+      <stop offset="100%" stop-color="#030210"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fff1b8"/>
+      <stop offset="35%" stop-color="#e8c15a"/>
+      <stop offset="70%" stop-color="#b8862b"/>
+      <stop offset="100%" stop-color="#f6dc8a"/>
+    </linearGradient>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="25%" stop-color="#b9fbff"/>
+      <stop offset="60%" stop-color="#2ad4e6"/>
+      <stop offset="100%" stop-color="#2ad4e6" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="tile"><rect x="40" y="40" width="944" height="944" rx="210"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#tile)">
+    <rect x="40" y="40" width="944" height="944" fill="url(#space)"/>
+    <!-- stars -->
+    <g fill="#ffffff">
+      <circle cx="190" cy="230" r="4" opacity=".8"/><circle cx="820" cy="190" r="5" opacity=".9"/>
+      <circle cx="760" cy="830" r="3" opacity=".7"/><circle cx="230" cy="790" r="4" opacity=".6"/>
+      <circle cx="330" cy="150" r="2.5" opacity=".6"/><circle cx="880" cy="520" r="3" opacity=".7"/>
+      <circle cx="140" cy="520" r="2.5" opacity=".5"/><circle cx="640" cy="120" r="2" opacity=".6"/>
+      <circle cx="420" cy="900" r="2.5" opacity=".6"/><circle cx="900" cy="700" r="2" opacity=".5"/>
+    </g>
+    <!-- orbit rings (the "universe computer") -->
+    <g fill="none" stroke="#2ad4e6" stroke-opacity=".35" stroke-width="3">
+      <ellipse cx="512" cy="512" rx="400" ry="150" transform="rotate(-24 512 512)"/>
+      <ellipse cx="512" cy="512" rx="400" ry="150" transform="rotate(24 512 512)"/>
+    </g>
+  </g>
+
+  <!-- Orokin diamond frame -->
+  <g filter="url(#glow)">
+    <path d="M512 150 L842 512 L512 874 L182 512 Z" fill="none" stroke="url(#gold)" stroke-width="34" stroke-linejoin="miter"/>
+    <path d="M512 232 L766 512 L512 792 L258 512 Z" fill="none" stroke="url(#gold)" stroke-width="10" opacity=".85"/>
+    <!-- filigree crests -->
+    <path d="M512 92 C540 130 540 150 512 176 C484 150 484 130 512 92 Z" fill="url(#gold)"/>
+    <path d="M512 932 C540 894 540 874 512 848 C484 874 484 894 512 932 Z" fill="url(#gold)"/>
+    <path d="M118 512 C156 484 176 484 202 512 C176 540 156 540 118 512 Z" fill="url(#gold)"/>
+    <path d="M906 512 C868 484 848 484 822 512 C848 540 868 540 906 512 Z" fill="url(#gold)"/>
+  </g>
+
+  <!-- Corpus circuit traces -->
+  <g stroke="#2ad4e6" stroke-width="8" fill="none" stroke-linecap="square" opacity=".9">
+    <path d="M330 512 H392 L420 484"/>
+    <path d="M694 512 H632 L604 540"/>
+    <path d="M512 330 V380"/>
+    <path d="M512 694 V644"/>
+  </g>
+  <g fill="#2ad4e6">
+    <rect x="316" y="498" width="28" height="28"/><rect x="680" y="498" width="28" height="28"/>
+  </g>
+
+  <!-- void core -->
+  <circle cx="512" cy="512" r="170" fill="url(#core)" opacity=".55"/>
+  <circle cx="512" cy="512" r="104" fill="#05040f" stroke="url(#gold)" stroke-width="14"/>
+  <path d="M512 446 L578 512 L512 578 L446 512 Z" fill="url(#core)" filter="url(#glow)"/>
+  <circle cx="512" cy="512" r="16" fill="#ffffff"/>
+</svg>

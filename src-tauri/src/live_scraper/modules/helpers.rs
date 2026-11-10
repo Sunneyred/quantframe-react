@@ -805,3 +805,65 @@ pub fn minimum_profit_threshold(bought_price: i64, flat_profit: i64, percentage:
         flat_profit.max(bought_price.saturating_mul(percentage).saturating_add(99) / 100)
     }
 }
+
+/// Void Trader: days past the stale threshold (0 when not stale or disabled).
+pub fn stale_days_over(days_held: i64, stale_after_days: i64) -> i64 {
+    if is_disabled(stale_after_days) || days_held <= stale_after_days {
+        0
+    } else {
+        days_held - stale_after_days
+    }
+}
+
+/// Void Trader: shrink a minimum profit by `decay_pct` percent per stale day, never below `floor`.
+pub fn decay_min_profit(min_profit: i64, stale_days: i64, decay_pct: i64, floor: i64) -> i64 {
+    if stale_days <= 0 || decay_pct <= 0 {
+        return min_profit;
+    }
+    let remaining_pct = (100 - decay_pct.saturating_mul(stale_days)).max(0);
+    let decayed = min_profit.saturating_mul(remaining_pct) / 100;
+    decayed.max(floor).min(min_profit)
+}
+
+/// Void Trader: expected resale price for a bought item — the lower of the cheapest live
+/// seller (minus our undercut) and the recent closed average, so we never count on a spike.
+pub fn expected_resale_price(lowest_sell: i64, closed_avg: i64, undercut: i64) -> i64 {
+    let live = if lowest_sell > 0 {
+        lowest_sell - undercut.max(0)
+    } else {
+        i64::MAX
+    };
+    let avg = if closed_avg > 0 { closed_avg } else { i64::MAX };
+    let price = live.min(avg);
+    if price == i64::MAX { 0 } else { price }
+}
+
+#[cfg(test)]
+mod void_trader_tests {
+    use super::*;
+
+    #[test]
+    fn stale_days() {
+        assert_eq!(stale_days_over(3, 5), 0);
+        assert_eq!(stale_days_over(7, 5), 2);
+        assert_eq!(stale_days_over(30, -1), 0);
+    }
+
+    #[test]
+    fn decay() {
+        assert_eq!(decay_min_profit(10, 0, 20, 2), 10);
+        assert_eq!(decay_min_profit(10, 1, 20, 2), 8);
+        assert_eq!(decay_min_profit(10, 3, 20, 2), 4);
+        assert_eq!(decay_min_profit(10, 9, 20, 2), 2);
+        assert_eq!(decay_min_profit(10, 9, 20, -5), 0);
+        assert_eq!(decay_min_profit(1, 2, 20, 2), 1);
+    }
+
+    #[test]
+    fn resale() {
+        assert_eq!(expected_resale_price(30, 25, 1), 25);
+        assert_eq!(expected_resale_price(20, 25, 1), 19);
+        assert_eq!(expected_resale_price(0, 25, 1), 25);
+        assert_eq!(expected_resale_price(0, 0, 1), 0);
+    }
+}

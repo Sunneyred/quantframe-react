@@ -23,7 +23,7 @@ const validateTheme = (theme: Record<string, any>) => {
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [currentTheme, setCurrentTheme] = useLocalStorage<object>({
-    key: "theme",
+    key: "void_trader_theme",
     defaultValue: defaultTheme.properties,
   });
 
@@ -61,7 +61,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   );
 
   const resetTheme = useCallback(() => {
-    setCurrentTheme(defaultTheme);
+    setCurrentTheme(defaultTheme.properties);
   }, [setCurrentTheme]);
 
   const exportTheme = useCallback(() => {

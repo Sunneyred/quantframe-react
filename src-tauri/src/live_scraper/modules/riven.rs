@@ -74,7 +74,7 @@ impl RivenModule {
         let interesting_items = Self::interesting_items().await?;
         let total = interesting_items.len();
 
-        for (index, mut stock_riven) in interesting_items.into_iter().enumerate() {
+        'rivens: for (index, mut stock_riven) in interesting_items.into_iter().enumerate() {
             let stock_riven = &mut stock_riven;
 
             // Stop if the scraper stopped running or the user is banned.
@@ -141,41 +141,62 @@ impl RivenModule {
                 operations.add("Delete");
             }
 
-            let mut live_auctions = if stock_riven.is_hidden {
-                AuctionList::<AuctionWithOwner>::new(vec![])
-            } else {
-                match wfm_client
-                    .auction()
-                    .search_auctions(get_filter(stock_riven))
-                    .await
-                {
-                    Ok(auctions) => auctions,
-                    Err(wf_market::errors::ApiError::TooManyRequests(err)) => {
-                        warning(
-                            format!("{}:Check", COMPONENT),
-                            &format!(
-                                "Rate limited when getting live auctions for item {}. Skipping this item for now.",
-                                stock_riven.wfm_weapon_url
-                            ),
-                            &log_options,
-                        );
-                        self.send_event("rate_limited", Some(json!({"seconds": err.retry_after})));
-                        continue;
-                    }
-                    Err(e) => {
-                        return Err(Error::from_wfm(
-                            format!("{}:Check", COMPONENT),
-                            &format!(
-                                "Failed to get live auctions for item {}",
-                                stock_riven.wfm_weapon_url
-                            ),
-                            e,
-                            get_location!(),
-                        ))
+            // Void Trader: compare against rivens that share this riven's positive stats first,
+            // and only fall back to every riven for the weapon when too few comparables exist.
+            let use_auto_match = settings.wts.auto_match_stats
+                && !stock_riven.filter.enabled.unwrap_or(false)
+                && stock_riven.attributes.0.iter().any(|a| a.positive);
+            let mut searches = Vec::new();
+            if use_auto_match {
+                searches.push((get_stat_matched_filter(stock_riven), true));
+            }
+            searches.push((get_filter(stock_riven), false));
+
+            let mut stat_matched = false;
+            let mut live_auctions = AuctionList::<AuctionWithOwner>::new(vec![]);
+            if !stock_riven.is_hidden {
+                for (filter, is_stat_search) in searches {
+                    match wfm_client.auction().search_auctions(filter).await {
+                        Ok(mut auctions) => {
+                            auctions.filter_username(&app.user.wfm_username, true);
+                            if is_stat_search
+                                && (auctions.total_auctions() as i64) < settings.wts.min_comparables
+                            {
+                                continue;
+                            }
+                            stat_matched = is_stat_search;
+                            live_auctions = auctions;
+                            break;
+                        }
+                        Err(wf_market::errors::ApiError::TooManyRequests(err)) => {
+                            warning(
+                                format!("{}:Check", COMPONENT),
+                                &format!(
+                                    "Rate limited when getting live auctions for item {}. Skipping this item for now.",
+                                    stock_riven.wfm_weapon_url
+                                ),
+                                &log_options,
+                            );
+                            self.send_event("rate_limited", Some(json!({"seconds": err.retry_after})));
+                            continue 'rivens;
+                        }
+                        Err(e) => {
+                            return Err(Error::from_wfm(
+                                format!("{}:Check", COMPONENT),
+                                &format!(
+                                    "Failed to get live auctions for item {}",
+                                    stock_riven.wfm_weapon_url
+                                ),
+                                e,
+                                get_location!(),
+                            ))
+                        }
                     }
                 }
-            };
-            live_auctions.filter_username(&app.user.wfm_username, true);
+            }
+            if stat_matched {
+                operations.add("StatMatched");
+            }
             live_auctions.sort_by_platinum();
 
             // Base price: the model estimate when enabled, otherwise the market average.
@@ -197,12 +218,23 @@ impl RivenModule {
                 stock_riven.is_dirty = true;
             }
 
+            // The setting is entered as a percentage (15 = 15%), the helper expects a fraction.
+            let threshold = if settings.wts.threshold_percentage > 1.0 {
+                settings.wts.threshold_percentage / 100.0
+            } else {
+                settings.wts.threshold_percentage
+            };
             let mut post_price = predicted.unwrap_or_else(|| {
-                average_filtered_lowest_prices(
-                    live_auctions.prices(),
-                    settings.wts.max_results,
-                    settings.wts.threshold_percentage,
-                )
+                if stat_matched && live_auctions.total_auctions() > 0 {
+                    // Like-for-like comparables: list just under the cheapest one.
+                    (live_auctions.lowest_price() - settings.wts.undercut_step.max(0)).max(1)
+                } else {
+                    average_filtered_lowest_prices(
+                        live_auctions.prices(),
+                        settings.wts.max_results,
+                        threshold,
+                    )
+                }
             });
 
             // No live auctions and no prediction: fall back to the minimum profitable price.
@@ -477,6 +509,22 @@ fn price_input(stock_riven: &Model) -> RivenPriceInput {
             .find(|attr| !attr.positive)
             .map(|attr| attr.wfm_url.clone()),
     }
+}
+
+/// Void Trader: search for rivens on the same weapon that share this riven's positive stats.
+fn get_stat_matched_filter(entity: &Model) -> AuctionFilter {
+    let positive_stats = entity
+        .attributes
+        .0
+        .iter()
+        .filter(|a| a.positive)
+        .map(|a| a.wfm_url.clone())
+        .collect::<Vec<_>>();
+    AuctionFilter::new(AuctionType::Riven, &entity.wfm_weapon_url)
+        .with_buyout_policy("direct")
+        .with_user_activity(StatusType::InGame)
+        .with_sort_by("price_asc")
+        .with_positive_stats(positive_stats)
 }
 
 fn get_filter(entity: &Model) -> AuctionFilter {

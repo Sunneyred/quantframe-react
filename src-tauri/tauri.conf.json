@@ -16,21 +16,21 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "createUpdaterArtifacts": true,
+    "createUpdaterArtifacts": false,
     "resources": {
       "resources/*": "resources/",
       "resources/sounds/*": "resources/sounds/"
     }
   },
-  "productName": "Quantframe",
-  "mainBinaryName": "Quantframe",
+  "productName": "Void Trader",
+  "mainBinaryName": "VoidTrader",
   "version": "1.6.31",
   "identifier": "dev.kenya.quantframe",
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ3NEIwMTI1MzA3Q0E1OEYKUldTUHBYd3dKUUZMMTczQ2pIYTR0bklLQXlaMkxvK0V0a0RMQytNMTdqZzBCWitQRnNIWDhxYnAK",
       "endpoints": [
-        "https://api.quantframe.app/release/{{target}}/{{arch}}/{{current_version}}"
+        "https://github.com/Sunneyred/quantframe-react/releases/latest/download/latest.json"
       ]
     }
   },
@@ -40,7 +40,7 @@
         "fullscreen": false,
         "userAgent": "Quantframe",
         "resizable": true,
-        "title": "Quantframe - By Kenya-DK",
+        "title": "Void Trader",
         "width": 1455,
         "height": 912,
         "useHttpsScheme": true

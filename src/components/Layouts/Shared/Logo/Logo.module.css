@@ -1,4 +1,17 @@
 .logo {
-  width: rem(50px);
-  height: rem(50px);
+  width: rem(44px);
+  height: rem(44px);
+  filter: drop-shadow(0 0 6px rgba(232, 193, 90, 0.55));
+}
+
+.wordmark {
+  letter-spacing: 0.32em;
+  font-weight: 600;
+  text-shadow: 0 0 12px rgba(232, 193, 90, 0.45);
+}
+
+.version {
+  color: var(--vt-corpus, #2ad4e6);
+  letter-spacing: 0.08em;
+  opacity: 0.85;
 }

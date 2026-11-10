@@ -461,12 +461,36 @@ impl ItemModule {
             trade_operations.add(reason);
         }
 
+        // Void Trader: price the resale conservatively (the lower of live sellers and the closed
+        // average), then outbid the top buyer only if the margin still clears every threshold.
+        let expected_resale = expected_resale_price(
+            entry.sell_market_info.lowest_price,
+            closed_avg as i64,
+            settings.wts.undercut_step,
+        );
+        let clears_margin = |price: i64| -> bool {
+            let profit = expected_resale - price;
+            let roi_ok = is_disabled(settings.wtb.min_roi_percentage)
+                || (price > 0 && profit * 100 >= settings.wtb.min_roi_percentage * price);
+            profit >= profit_threshold.max(1) && roi_ok
+        };
+        if !is_disabled(settings.wtb.outbid_step)
+            && settings.wtb.outbid_step > 0
+            && !trade_operations.has("MaxPriceDrop")
+        {
+            let outbid = post_price + settings.wtb.outbid_step;
+            if clears_margin(outbid) {
+                post_price = outbid;
+                trade_operations.add("Outbid");
+            }
+        }
+
         // How far above (positive) or below (negative) our post price is from the market average.
         // Used to gauge whether we're overpaying relative to recent trades.
         let closed_avg_metric = closed_avg as i64 - post_price;
 
-        // Rough expected profit: the margin between our buy price and the average sell price, minus 1 plat buffer.
-        let potential_profit = closed_avg_metric - 1;
+        // Expected profit if we resell at the conservative resale price.
+        let potential_profit = expected_resale - post_price;
 
         // Per-item max price cap — if this item has a specific max configured, clamp the post price.
         let item_max_price = settings.general.get_item_max_price(&item_info.wfm_id);
@@ -539,8 +563,8 @@ impl ItemModule {
             trade_operations.add("Overpriced");
         }
 
-        // If the spread between lowest and highest buy orders is too narrow, not worth competing.
-        if market_info.price_range < profit_threshold {
+        // Void Trader: skip flips whose expected resale margin or ROI is too thin.
+        if !clears_margin(post_price) {
             trade_operations.add("Delete");
             trade_operations.add("Underpriced");
         }
@@ -724,8 +748,13 @@ impl ItemModule {
             0
         };
 
-        // Start with the lowest competitor price as the initial post price
-        let mut post_price = lowest_price;
+        // Start with the lowest competitor price as the initial post price.
+        // Void Trader: undercut the cheapest seller so our listing is shown first.
+        let mut post_price = if lowest_price > 0 && !is_disabled(settings.wts.undercut_step) {
+            (lowest_price - settings.wts.undercut_step).max(1)
+        } else {
+            lowest_price
+        };
 
         // Clamp to per-item minimum price if set
         if let Some(min_price) = min_price {
@@ -778,11 +807,32 @@ impl ItemModule {
         // Ensure profit meets the flat or percentage threshold by raising the price if needed
         let mut profit = post_price - bought_price;
         let flat_minimum_profit = min_profit.unwrap_or(settings.wts.min_profit);
-        let minimum_profit = minimum_profit_threshold(
+        let mut minimum_profit = minimum_profit_threshold(
             bought_price,
             flat_minimum_profit,
             settings.wts.min_profit_percentage,
         );
+
+        // Void Trader: stale-stock decay. Capital stuck in items that don't sell earns nothing,
+        // so after `stale_after_days` the required profit shrinks each day down to a floor.
+        let days_held = (chrono::Utc::now() - stock_item.created_at).num_days();
+        let stale_days = stale_days_over(days_held, settings.wts.stale_after_days);
+        if stale_days > 0 && !is_disabled(minimum_profit) {
+            let decayed = decay_min_profit(
+                minimum_profit,
+                stale_days,
+                settings.wts.stale_decay_percentage,
+                settings.wts.stale_floor_profit,
+            );
+            if decayed != minimum_profit {
+                log(&format!(
+                    "Item {} held {} days ({} stale): min profit {} -> {}.",
+                    item_info.name, days_held, stale_days, minimum_profit, decayed
+                ));
+                minimum_profit = decayed;
+                trade_operations.add("StaleDecay");
+            }
+        }
 
         if !is_disabled(minimum_profit) && profit < minimum_profit {
             let adjustment = minimum_profit - profit;

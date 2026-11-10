@@ -1,0 +1,154 @@
+/* ==========================================================================
+   VOID TRADER — "universe computer" skin
+   Orokin gold filigree + Corpus holo-cyan over deep space.
+   ========================================================================== */
+
+:root {
+  --vt-gold: #e8c15a;
+  --vt-gold-soft: rgba(232, 193, 90, 0.35);
+  --vt-gold-faint: rgba(232, 193, 90, 0.12);
+  --vt-corpus: #2ad4e6;
+  --vt-corpus-faint: rgba(42, 212, 230, 0.1);
+  --vt-void: #050412;
+  --vt-panel: rgba(16, 13, 38, 0.72);
+}
+
+/* --- Deep space backdrop: nebula + two star layers + faint holo grid --- */
+body {
+  background-color: var(--vt-void);
+  background-image:
+    radial-gradient(ellipse at 18% 12%, rgba(98, 60, 180, 0.22) 0%, transparent 45%),
+    radial-gradient(ellipse at 85% 85%, rgba(42, 212, 230, 0.12) 0%, transparent 40%),
+    radial-gradient(ellipse at 60% 40%, rgba(232, 193, 90, 0.06) 0%, transparent 50%),
+    radial-gradient(1px 1px at 20px 30px, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 120px 80px, rgba(255, 255, 255, 0.7) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 200px 150px, rgba(185, 251, 255, 0.9) 50%, transparent 51%),
+    radial-gradient(1px 1px at 330px 60px, rgba(255, 255, 255, 0.6) 50%, transparent 51%),
+    radial-gradient(1px 1px at 280px 260px, rgba(246, 220, 138, 0.8) 50%, transparent 51%),
+    linear-gradient(rgba(42, 212, 230, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(42, 212, 230, 0.035) 1px, transparent 1px);
+  background-size:
+    100% 100%, 100% 100%, 100% 100%,
+    360px 300px, 360px 300px, 360px 300px, 360px 300px, 360px 300px,
+    48px 48px, 48px 48px;
+  background-attachment: fixed;
+}
+
+/* Slow twinkle drift on the star layers */
+@keyframes vt-drift {
+  from { background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0; }
+  to { background-position: 0 0, 0 0, 0 0, 360px 0, 360px 0, 360px 0, 360px 0, 360px 0, 0 0, 0 0; }
+}
+body { animation: vt-drift 240s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  body { animation: none; }
+}
+
+/* --- Shell surfaces become translucent holo-panels --- */
+.mantine-AppShell-header,
+.mantine-AppShell-navbar {
+  background: linear-gradient(180deg, rgba(12, 10, 31, 0.92), rgba(5, 4, 18, 0.88)) !important;
+  backdrop-filter: blur(6px);
+  border-color: var(--vt-gold-soft) !important;
+}
+
+.mantine-AppShell-header {
+  box-shadow: 0 1px 0 var(--vt-gold-soft), 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+
+.mantine-AppShell-main {
+  background: transparent !important;
+}
+
+.mantine-Paper-root,
+.mantine-Card-root {
+  background-color: var(--vt-panel);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--vt-gold-faint);
+  position: relative;
+}
+
+/* Orokin corner filigree on cards */
+.mantine-Card-root::before,
+.mantine-Card-root::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  border-color: var(--vt-gold);
+  border-style: solid;
+  opacity: 0.75;
+}
+.mantine-Card-root::before {
+  top: -1px;
+  left: -1px;
+  border-width: 2px 0 0 2px;
+}
+.mantine-Card-root::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 2px 2px 0;
+}
+
+/* --- Controls --- */
+.mantine-Button-root[data-variant="filled"] {
+  background: linear-gradient(135deg, #f6dc8a 0%, #e8c15a 40%, #b8862b 100%);
+  color: #1a1206;
+  border: 1px solid #fff1b8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(232, 193, 90, 0.25);
+}
+.mantine-Button-root[data-variant="filled"]:hover {
+  box-shadow: 0 0 16px rgba(232, 193, 90, 0.5);
+}
+
+.mantine-Tabs-tab[data-active] {
+  color: var(--vt-gold);
+  text-shadow: 0 0 8px rgba(232, 193, 90, 0.45);
+}
+
+.mantine-Tabs-list::before {
+  border-color: var(--vt-gold-faint) !important;
+}
+
+.mantine-Input-input:focus,
+.mantine-Input-input:focus-within {
+  border-color: var(--vt-corpus);
+  box-shadow: 0 0 0 1px var(--vt-corpus-faint), 0 0 10px var(--vt-corpus-faint);
+}
+
+/* Navbar links: corpus holo glow on hover, gold when active */
+.mantine-NavLink-root:hover,
+.mantine-UnstyledButton-root:hover {
+  text-shadow: 0 0 6px rgba(42, 212, 230, 0.5);
+}
+
+/* --- Tables read like a terminal readout --- */
+.mantine-Table-thead,
+.mantine-datatable thead {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--vt-gold);
+}
+
+.mantine-Table-tr:hover,
+.mantine-datatable tbody tr:hover {
+  background-color: var(--vt-corpus-faint) !important;
+}
+
+/* Thin gold scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(5, 4, 18, 0.6);
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #e8c15a, #966b20);
+  border-radius: 4px;
+}

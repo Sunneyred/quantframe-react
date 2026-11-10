@@ -198,6 +198,8 @@ export namespace TauriTypes {
     max_stock_quantity: number;
     max_price_drop: number;
     min_listings_below: number;
+    outbid_step: number;
+    min_roi_percentage: number;
   }
   export interface RivenSettings {
     general: RivenGeneralSettings;
@@ -211,6 +213,9 @@ export namespace TauriTypes {
     threshold_percentage: number;
     max_results: number;
     use_predict: boolean;
+    auto_match_stats: boolean;
+    min_comparables: number;
+    undercut_step: number;
   }
   export interface SummarySettings {
     recent_days: number;

@@ -61,6 +61,34 @@ export const WTSItemAccordion = ({ form }: WTSItemAccordionProps) => {
           radius="md"
           {...form.getInputProps(getFieldPath("min_listings_below"))}
         />
+        <NumberInput
+          label="Undercut by (plat)"
+          min={0}
+          rightSection={<TooltipIcon label="Void Trader lists this many plat below the cheapest seller so your order shows first. 0 matches them." />}
+          radius="md"
+          {...form.getInputProps(getFieldPath("undercut_step"))}
+        />
+        <NumberInput
+          label="Stale after (days)"
+          min={-1}
+          rightSection={<TooltipIcon label="After this many days in stock, the minimum profit starts shrinking so stuck plat gets freed up. -1 turns this off." />}
+          radius="md"
+          {...form.getInputProps(getFieldPath("stale_after_days"))}
+        />
+        <NumberInput
+          label="Stale decay per day (%)"
+          min={0}
+          rightSection={<TooltipIcon label="Percent of the minimum profit removed for each day an item is past the stale point." />}
+          radius="md"
+          {...form.getInputProps(getFieldPath("stale_decay_percentage"))}
+        />
+        <NumberInput
+          label="Stale profit floor (plat)"
+          min={-999}
+          rightSection={<TooltipIcon label="The lowest profit a stale item will ever be listed at. Use a negative number to allow a stop-loss." />}
+          radius="md"
+          {...form.getInputProps(getFieldPath("stale_floor_profit"))}
+        />
       </Group>
     </Box>
   );
