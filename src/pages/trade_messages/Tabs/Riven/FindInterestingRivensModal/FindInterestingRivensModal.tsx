@@ -1,13 +1,11 @@
 import { Box, Button, Card, Checkbox, Divider, Grid, Group, NumberInput, TagsInput, Title } from "@mantine/core";
-import { QuantframeApiTypes, TauriTypes } from "$types";
+import { QuantframeApiTypes } from "$types";
 import { useForm } from "@mantine/form";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { Round } from "@utils/helper";
 import { DataTable } from "mantine-datatable";
 import { useTranslatePages } from "@hooks/useTranslate.hook";
-import { HasPermission } from "@api/index";
-import { PatreonOverlay } from "@components/Shared/PatreonOverlay";
 export interface FindInterestingRivensModalProps {
   date: Date;
   rivens: QuantframeApiTypes.RivenPriceDto[];
@@ -22,7 +20,7 @@ interface RivenPriceWithDiscount extends QuantframeApiTypes.RivenPriceDto {
 // FindInteresting
 export function FindInterestingRivensModal({ date, rivens, onSubmit }: FindInterestingRivensModalProps) {
   const [filteredRivens, setFilteredRivens] = useState<RivenPriceWithDiscount[]>([]);
-  const [canUse, setCanUse] = useState<boolean>(false);
+  const canUse = true;
   const filterForm = useForm({
     initialValues: {
       minPrice: 50,
@@ -64,13 +62,13 @@ export function FindInterestingRivensModal({ date, rivens, onSubmit }: FindInter
   useEffect(() => {
     UpdateFilteredRivens();
   }, []);
-  // Check permissions for export on mount
-  useEffect(() => {
-    HasPermission(TauriTypes.PermissionsFlags.FIND_INTERESTING_RIVENS).then((res) => setCanUse(res));
-  }, []);
   return (
     <Box pos={"relative"}>
-      <PatreonOverlay permission={TauriTypes.PermissionsFlags.FIND_INTERESTING_RIVENS} tier="T2+" />
+      {rivens.length === 0 && (
+        <Title order={5} c="orokin.4" mb="sm">
+          No riven market data yet. Run "Scan riven market" in Trading Analytics, Riven tab first.
+        </Title>
+      )}
       <Title order={4}>{useTranslate("title", { date: dayjs(date).format("YYYY-MM-DD HH:mm:ss") })}</Title>
       <Grid>
         <Grid.Col span={4}>

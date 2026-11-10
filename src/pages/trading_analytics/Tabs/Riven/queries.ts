@@ -9,13 +9,11 @@ interface QueriesHooks {
 }
 
 export const useQueries = ({ queryData, isActive }: QueriesHooks) => {
+  // Void Trader: local data needs no date range (none = latest scan).
   const IsValid = () => {
-    if (queryData.to_date && queryData.from_date && isActive) {
-      const fromDate = new Date(queryData.from_date);
-      const toDate = new Date(queryData.to_date);
-      return fromDate <= toDate;
-    }
-    return false;
+    if (!isActive) return false;
+    if (queryData.to_date && queryData.from_date) return new Date(queryData.from_date) <= new Date(queryData.to_date);
+    return true;
   };
   // Pagination Query
   const getPaginationQuery = useQuery({
@@ -28,6 +26,14 @@ export const useQueries = ({ queryData, isActive }: QueriesHooks) => {
       queryData.query,
       queryData.sort_by,
       queryData.sort_direction,
+      queryData.volume_gt,
+      queryData.volume_lt,
+      queryData.min_price_gt,
+      queryData.min_price_lt,
+      queryData.max_price_gt,
+      queryData.max_price_lt,
+      queryData.avg_price_gt,
+      queryData.avg_price_lt,
     ],
     queryFn: () => api.riven.getAll(queryData),
     retry: false,

@@ -35,7 +35,7 @@ jobs:
 
       - name: Void Trader unit tests
         working-directory: src-tauri
-        run: cargo test --lib void_trader_tests
+        run: cargo test --lib -- void_trader_tests void_riven_market
 
       - uses: tauri-apps/tauri-action@v0
         id: tauri

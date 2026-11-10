@@ -1,6 +1,6 @@
 import { Box, Group, NumberFormatter, Paper, SimpleGrid } from "@mantine/core";
 import { useEffect, useState } from "react";
-import { QuantframeApiTypes, TauriTypes } from "$types";
+import { QuantframeApiTypes } from "$types";
 import { useQueries } from "./queries";
 import { SearchField } from "@components/Forms/SearchField";
 import { useTranslateCommon, useTranslatePages } from "@hooks/useTranslate.hook";
@@ -13,10 +13,9 @@ import { useForm } from "@mantine/form";
 import { DatePickerInput } from "@mantine/dates";
 import { ActionWithTooltip } from "@components/Shared/ActionWithTooltip";
 import { faDownload } from "@fortawesome/free-solid-svg-icons";
-import { HasPermission } from "@api/index";
+import { RivenMarketBar } from "./RivenMarketBar";
 import { useMutations } from "./mutations";
 import { Loading } from "@components/Shared/Loading";
-import { PatreonOverlay } from "@components/Shared/PatreonOverlay";
 import { MinMax } from "@components/Forms/MinMax";
 interface RivenPanelProps {
   isActive?: boolean;
@@ -29,10 +28,9 @@ export const RivenPanel = ({ isActive }: RivenPanelProps = {}) => {
     validate: {
       to_date: (value: string | undefined) => {
         const fromDate = queryData.values.from_date;
-        if (!fromDate) return true;
+        if (!fromDate || !value) return false;
         const to_date = dayjs(value).format("YYYY-MM-DD");
         if (dayjs(to_date).diff(dayjs(fromDate), "day") > 90) return true;
-        if (!dayjs(to_date).isBefore(dayjs().subtract(1, "day"))) return true;
         return false;
       },
     },
@@ -50,12 +48,11 @@ export const RivenPanel = ({ isActive }: RivenPanelProps = {}) => {
   const [filterOpened, setFilterOpened] = useState<boolean>(false);
   const [dates, setDates] = useState<[string | null, string | null]>([null, null]);
   const [canExport, setCanExport] = useState<boolean>(false);
-  const [canUse, setCanUse] = useState<boolean>(false);
+  const canUse = true;
 
   // Check permissions for export on mount
   useEffect(() => {
-    HasPermission(TauriTypes.PermissionsFlags.EXPORT_DATA).then((res) => setCanExport(res));
-    HasPermission(TauriTypes.PermissionsFlags.RIVEN_PRICES_SEARCH).then((res) => setCanUse(res));
+    setCanExport(true);
   }, []);
 
   // Queries
@@ -67,15 +64,15 @@ export const RivenPanel = ({ isActive }: RivenPanelProps = {}) => {
   });
   useEffect(() => {
     if (dates[0] && dates[1] && dates[0] > dates[1]) return;
-    if (dates[0]) queryData.setFieldValue("from_date", dates[0]);
-    if (dates[1]) queryData.setFieldValue("to_date", dates[1]);
+    queryData.setFieldValue("from_date", dates[0] || undefined);
+    queryData.setFieldValue("to_date", dates[1] || dates[0] || undefined);
   }, [dates]);
 
   const IsLoading = () => (paginationQuery.isFetching || exportMutation.isPending) && isActive && canUse;
 
   return (
     <Box p={"md"} pos={"relative"}>
-      <PatreonOverlay permission={TauriTypes.PermissionsFlags.RIVEN_PRICES_SEARCH} tier="T2+" />
+      <RivenMarketBar onScanComplete={() => refetchQueries()} />
       <SearchField
         value={queryData.values.query || ""}
         onSearch={() => {
@@ -89,10 +86,10 @@ export const RivenPanel = ({ isActive }: RivenPanelProps = {}) => {
         rightSection={
           <Group gap={3}>
             <DatePickerInput
-              required
-              placeholder={useTranslateTabItem("date_range_placeholder")}
-              minDate={dayjs(queryData.values.to_date).subtract(90, "day").format("YYYY-MM-DD")}
-              maxDate={dayjs().subtract(1, "day").format("YYYY-MM-DD")}
+              clearable
+              placeholder="Latest scan"
+              minDate={dayjs().subtract(90, "day").format("YYYY-MM-DD")}
+              maxDate={dayjs().format("YYYY-MM-DD")}
               w={200}
               type="range"
               valueFormat="YYYY MMM DD"
