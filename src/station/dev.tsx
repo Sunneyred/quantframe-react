@@ -10,13 +10,13 @@ import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
 import "../global.css";
 import "../void-trader.css";
-import StationPage from "./StationPage";
+import StationCore from "./StationCore";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <MantineProvider defaultColorScheme="dark">
       <div style={{ padding: 16, paddingTop: 65 + 16 }}>
-        <StationPage />
+        <StationCore />
       </div>
     </MantineProvider>
   </StrictMode>,

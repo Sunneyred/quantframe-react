@@ -4,17 +4,22 @@ import { Customers, type Customer } from "../entities/customers";
 import { Player } from "../entities/player";
 import { TankView, goalLineY } from "../fluid/TankView";
 import { FirstPersonView, PERSON_H, crateTop } from "../fp/FirstPersonView";
-import { distToRect, nearestOnRect, pointInRect } from "./collision";
+import { distToRect, isBlocked, nearestOnRect, pointInRect } from "./collision";
 import {
   COUNTER,
   COUNTER_SOLID,
   DOOR,
   DOOR_VAULT_SIDE,
   DOOR_WH_SIDE,
-  FLOOR,
+  FIXTURES,
+  FLOORS,
   INTERACT_RANGE,
   PAL,
   RACK,
+  ROOMS,
+  ROW_H,
+  SOLIDS,
+  SOUTH_DOOR,
   TANK_FILL_GOAL,
   TANK_FILL_MIN,
   TANK_FRAME,
@@ -23,15 +28,21 @@ import {
   TANK_USE,
   VIEW_H,
   VIEW_W,
-  WH_FLOOR,
   WH_OX,
+  fixtureById,
+  roomAt,
   terminalRect,
+  type Fixture,
+  type FixtureId,
   type Rect,
+  type RoomId,
 } from "./constants";
 import { Keyboard } from "./input";
 import { LabelLayer } from "./labels";
 import { clamp, easeLevel, planSurge, progressToFill, type Buyer, type GoalSnapshot } from "./logic";
+import { BridgeRoom, ShopRoom, Terminals, type TraderState } from "./lowerRooms";
 import { READOUT, Room, SIGN } from "./room";
+import { EMPTY_SHOP, statusCss, statusText, type ShopCrate, type ShopLayout, type WantedBoard } from "./shop";
 import { BAYS, LISTED_CSS, TIER_CSS, layoutWarehouse, type BayKey, type Crate, type WarehouseLayout } from "./warehouse";
 import { WarehouseRoom, crateLift } from "./warehouseRoom";
 
@@ -42,10 +53,27 @@ export type InteractTarget =
   /** A stock crate, by the item's unique name. */
   | { kind: "crate"; id: string }
   /** The terminal at the end of a bay. */
-  | { kind: "terminal"; category: BayKey };
+  | { kind: "terminal"; category: BayKey }
+  /** A lever, desk, terminal, wall plate or hatch (see FIXTURES). */
+  | { kind: "fixture"; id: FixtureId }
+  /** A stock item or stock riven on the Shop Floor shelves, by database id. */
+  | { kind: "stock"; id: number }
+  | { kind: "riven"; id: number }
+  /** A wanted poster (wish list entry). */
+  | { kind: "wish"; id: number };
 
 export type ViewMode = "top" | "fp";
-export type RoomId = "vault" | "warehouse";
+export type { RoomId };
+
+/** Every door you can click in the top-down view: where it is on screen, and the walk through it. */
+const DOOR_LINKS: Array<{ room: RoomId; hit: Rect; to: { x: number; y: number }; via: { x: number; y: number } }> = [
+  { room: "vault", hit: { x: SOUTH_DOOR.x - 4, y: 256, w: SOUTH_DOOR.w + 8, h: 16 }, to: { x: 238, y: ROW_H + 84 }, via: { x: 238, y: 252 } },
+  { room: "warehouse", hit: { x: SOUTH_DOOR.x - 4, y: 256, w: SOUTH_DOOR.w + 8, h: 16 }, to: { x: WH_OX + 238, y: ROW_H + 84 }, via: { x: WH_OX + 238, y: 252 } },
+  { room: "bridge", hit: { x: SOUTH_DOOR.x - 4, y: 0, w: SOUTH_DOOR.w + 8, h: 70 }, to: { x: 238, y: 250 }, via: { x: 238, y: ROW_H + 78 } },
+  { room: "shop", hit: { x: SOUTH_DOOR.x - 4, y: 0, w: SOUTH_DOOR.w + 8, h: 70 }, to: { x: WH_OX + 238, y: 250 }, via: { x: WH_OX + 238, y: ROW_H + 78 } },
+  { room: "bridge", hit: { x: DOOR.x - 6, y: DOOR.y - 4, w: 16, h: DOOR.h + 8 }, to: { x: DOOR_WH_SIDE.x, y: ROW_H + DOOR_WH_SIDE.y }, via: { x: DOOR_VAULT_SIDE.x, y: ROW_H + DOOR_VAULT_SIDE.y } },
+  { room: "shop", hit: { x: 0, y: DOOR.y - 4, w: 14, h: DOOR.h + 8 }, to: { x: DOOR_VAULT_SIDE.x, y: ROW_H + DOOR_VAULT_SIDE.y }, via: { x: DOOR_WH_SIDE.x, y: ROW_H + DOOR_WH_SIDE.y } },
+];
 
 export interface StationCallbacks {
   onInteract(target: InteractTarget): void;
@@ -60,6 +88,8 @@ export interface StationCallbacks {
   onQuickPanel?(): void;
   /** Pointer lock was taken or released (first person). */
   onPointerLock?(locked: boolean): void;
+  /** M, K or /, H or ? were pressed. */
+  onOverlay?(which: "map" | "palette" | "help"): void;
 }
 
 interface Floater {
@@ -98,6 +128,8 @@ export class StationGame {
   /** Static labels of each room (room-local coordinates), and the labels that follow things. */
   private labelsVault: LabelLayer;
   private labelsWh: LabelLayer;
+  private labelsBridge: LabelLayer;
+  private labelsShop: LabelLayer;
   private labels: LabelLayer;
   private resizeObserver: ResizeObserver | null = null;
   private keyboard: Keyboard | null = null;
@@ -106,6 +138,9 @@ export class StationGame {
   private world: Container | null = null;
   private room: Room | null = null;
   private warehouse: WarehouseRoom | null = null;
+  private bridge: BridgeRoom | null = null;
+  private shop: ShopRoom | null = null;
+  private terminals: Terminals | null = null;
   private tank: TankView | null = null;
   private player: Player | null = null;
   private customers: Customers | null = null;
@@ -122,7 +157,14 @@ export class StationGame {
   private mode: ViewMode = "top";
   private roomId: RoomId = "vault";
   private camX = 0;
+  private camY = 0;
   private hover: Crate | null = null;
+  private hoverShop: ShopCrate | null = null;
+  private shopData: ShopLayout = EMPTY_SHOP;
+  private trader: TraderState = { running: false, message: "" };
+  private trades: number | null = null;
+  private alerts = new Map<FixtureId, boolean>();
+  private paused = false;
   private time = 0;
 
   private elPlat: HTMLDivElement;
@@ -142,6 +184,8 @@ export class StationGame {
     host.appendChild(this.stage);
     this.labelsVault = new LabelLayer(this.stage);
     this.labelsWh = new LabelLayer(this.stage);
+    this.labelsBridge = new LabelLayer(this.stage);
+    this.labelsShop = new LabelLayer(this.stage);
     this.labels = new LabelLayer(this.stage);
 
     const v = this.labelsVault;
@@ -159,6 +203,9 @@ export class StationGame {
     v.place(sign, SIGN.x + SIGN.w / 2, SIGN.y + SIGN.h / 2);
     const door = v.add("vt-station-door-tag", "WAREHOUSE");
     v.place(door, DOOR.x - 3, DOOR.y - 6);
+    v.place(v.add("vt-station-door-tag vt-station-door-tag-mid", "CONTROL DECK"), SOUTH_DOOR.x + SOUTH_DOOR.w / 2, VIEW_H - 11);
+    const w = this.labelsWh;
+    w.place(w.add("vt-station-door-tag vt-station-door-tag-mid", "SHOP FLOOR"), SOUTH_DOOR.x + SOUTH_DOOR.w / 2, VIEW_H - 11);
 
     this.elCrate = this.labels.add("vt-station-crate-bubble", "");
     this.labels.show(this.elCrate, false);
@@ -208,15 +255,26 @@ export class StationGame {
     this.customers = new Customers(sorted);
     this.warehouse = new WarehouseRoom(sorted, this.labelsWh);
     this.warehouse.setLayout(this.layoutData);
+    this.bridge = new BridgeRoom(sorted, this.labelsBridge);
+    this.bridge.setTrader(this.trader);
+    this.bridge.setTrades(this.trades);
+    if (this.goal) this.bridge.setGoal(this.goal);
+    this.shop = new ShopRoom(sorted, this.labelsShop);
+    this.shop.setLayout(this.shopData);
+    this.terminals = new Terminals(sorted, { vault: this.labelsVault, warehouse: this.labelsWh, bridge: this.labelsBridge, shop: this.labelsShop });
+    for (const [id, on] of this.alerts) this.terminals.setAlert(id, on);
     sorted.addChild(this.room.counter, this.player.sprite.view);
     const world = new Container();
-    world.addChild(this.room.back, this.warehouse.back, this.tank.view, sorted, this.room.front);
+    world.addChild(this.room.back, this.warehouse.back, this.bridge.back, this.shop.back, this.tank.view, sorted, this.room.front);
     app.stage.addChild(world);
     this.world = world;
 
     // --- first-person renderer over the same state
     this.fp = new FirstPersonView(this.stage, this.labelsVault.root);
     this.fp.setLayout(this.layoutData);
+    this.fp.setShop(this.shopData);
+    this.fp.setTrader(this.trader);
+    this.fp.setTrades(this.trades);
     if (this.goal) this.fp.setGoal(this.goal);
     this.fp.canvas.addEventListener("pointerdown", this.handleFpPointer);
     this.applyLowPower();
@@ -237,7 +295,7 @@ export class StationGame {
     this.layout();
 
     app.ticker.add(this.tick);
-    if (!document.hidden) app.ticker.start();
+    if (!document.hidden && !this.paused) app.ticker.start();
     if (this.goal) this.renderGoal();
     this.applyView();
   }
@@ -260,6 +318,74 @@ export class StationGame {
     }
     this.renderGoal();
     this.fp?.setGoal(goal);
+    this.bridge?.setGoal(goal);
+  }
+
+  /** New Shop Floor stock (stock items, stock rivens, wish list). */
+  setShop(layout: ShopLayout) {
+    this.shopData = layout;
+    this.hoverShop = null;
+    this.shop?.setLayout(layout);
+    this.fp?.setShop(layout);
+  }
+
+  /** Running state and status line of the live trader, shown on the Control Deck. */
+  setTrader(state: TraderState) {
+    if (state.running === this.trader.running && state.message === this.trader.message) return;
+    this.trader = state;
+    this.bridge?.setTrader(state);
+    this.fp?.setTrader(state);
+  }
+
+  /** Trades left today for the docks board, or null when unknown. */
+  setTrades(trades: number | null) {
+    this.trades = trades;
+    this.bridge?.setTrades(trades);
+    this.fp?.setTrades(trades);
+  }
+
+  /** Flash a terminal's screen (unread chat on the comms terminal). */
+  setAlert(id: FixtureId, on: boolean) {
+    this.alerts.set(id, on);
+    this.terminals?.setAlert(id, on);
+  }
+
+  /** Fast travel: put the player somewhere, facing a direction. */
+  travelTo(x: number, y: number, angle: number) {
+    const p = this.player;
+    if (!p) return;
+    p.stop();
+    p.x = x;
+    p.y = y;
+    p.angle = angle;
+    p.sprite.dir = dirFromAngle(angle);
+    p.sprite.setPosition(x, y);
+    this.keyboard?.clear();
+    // while paused nothing ticks: switch rooms now so the view is right when the panel closes
+    this.syncRoom(true);
+  }
+
+  travelToFixture(id: FixtureId) {
+    const f = fixtureById(id);
+    this.travelTo(f.use.x, f.use.y, f.face);
+  }
+
+  travelToRoom(room: RoomId) {
+    const { ox, oy } = ROOMS[room];
+    this.travelTo(ox + 238, oy + 190, -Math.PI / 2);
+  }
+
+  get position(): { x: number; y: number; room: RoomId } {
+    return { x: this.player?.x ?? 0, y: this.player?.y ?? 0, room: this.roomId };
+  }
+
+  /** Stop drawing and simulating while something covers the whole station. */
+  setPaused(paused: boolean) {
+    this.paused = paused;
+    const app = this.app;
+    if (!app) return;
+    if (paused) app.ticker.stop();
+    else if (!document.hidden) app.ticker.start();
   }
 
   /** New warehouse stock (from the sell finder). Both views rebuild their crates from it. */
@@ -315,6 +441,11 @@ export class StationGame {
     return true;
   }
 
+  /** The buyer at the front of the queue, if anyone is waiting. */
+  get nextBuyer(): Buyer | null {
+    return this.customers?.head?.buyer ?? null;
+  }
+
   dismissBuyer(id: string) {
     this.customers?.dismiss(id);
   }
@@ -329,7 +460,12 @@ export class StationGame {
       this.player?.stop();
       // a card or panel is open: give the mouse back
       this.releasePointer();
+      this.current = null;
+      this.labels.show(this.elPrompt, false);
+      this.labels.show(this.elCrate, false);
+      this.stage.classList.remove("vt-station-stage-target");
     }
+    this.updateHint();
   }
 
   setLowPower(low: boolean) {
@@ -367,6 +503,9 @@ export class StationGame {
       app.ticker.stop();
       this.customers?.destroy();
       this.warehouse?.destroy();
+      this.bridge?.destroy();
+      this.shop?.destroy();
+      this.terminals?.destroy();
       this.tank?.destroy();
       app.destroy({ removeView: true }, { children: true, texture: true });
       this.app = null;
@@ -375,6 +514,8 @@ export class StationGame {
     this.floaters = [];
     this.labelsVault.destroy();
     this.labelsWh.destroy();
+    this.labelsBridge.destroy();
+    this.labelsShop.destroy();
     this.labels.destroy();
     this.stage.remove();
   }
@@ -401,8 +542,11 @@ export class StationGame {
     this.fp?.setVisible(!top);
     this.labelsVault.root.style.display = top && this.roomId === "vault" ? "" : "none";
     this.labelsWh.root.style.display = top && this.roomId === "warehouse" ? "" : "none";
-    this.camX = this.roomId === "warehouse" ? WH_OX : 0;
-    if (this.world) this.world.x = -this.camX;
+    this.labelsBridge.root.style.display = top && this.roomId === "bridge" ? "" : "none";
+    this.labelsShop.root.style.display = top && this.roomId === "shop" ? "" : "none";
+    this.camX = ROOMS[this.roomId].ox;
+    this.camY = ROOMS[this.roomId].oy;
+    if (this.world) this.world.position.set(-this.camX, -this.camY);
     this.stage.classList.toggle("vt-station-stage-fp", !top);
     this.updateHint();
   }
@@ -441,12 +585,28 @@ export class StationGame {
     if (document.hidden) {
       app.ticker.stop();
       this.keyboard?.clear();
-    } else {
+    } else if (!this.paused) {
       app.ticker.start();
     }
   };
 
-  private handlePress = (code: string) => {
+  /** Follow the player into another room (with a little hysteresis in the doorways). */
+  private syncRoom(now = false) {
+    const p = this.player;
+    if (!p) return;
+    const { ox, oy } = ROOMS[this.roomId];
+    const m = now ? 0 : 2;
+    if (p.x >= ox - m && p.x <= ox + VIEW_W + m && p.y >= oy - m && p.y <= oy + ROW_H + m) return;
+    const next = roomAt(p.x, p.y);
+    if (next === this.roomId) return;
+    this.roomId = next;
+    this.hover = null;
+    this.hoverShop = null;
+    this.applyView();
+    this.callbacks.onRoom?.(next);
+  }
+
+  private handlePress = (code: string, key: string) => {
     switch (code) {
       case "KeyE":
         if (this.current) this.callbacks.onInteract(this.current);
@@ -463,6 +623,18 @@ export class StationGame {
       case "Tab":
         this.callbacks.onQuickPanel?.();
         break;
+      case "KeyM":
+        this.callbacks.onOverlay?.("map");
+        break;
+      case "KeyK":
+        this.callbacks.onOverlay?.("palette");
+        break;
+      case "KeyH":
+        this.callbacks.onOverlay?.("help");
+        break;
+      case "Slash":
+        this.callbacks.onOverlay?.(key === "?" ? "help" : "palette");
+        break;
     }
   };
 
@@ -470,7 +642,69 @@ export class StationGame {
     if (!this.app) return null;
     const rect = this.app.canvas.getBoundingClientRect();
     if (rect.width === 0) return null;
-    return { x: ((e.clientX - rect.left) / rect.width) * VIEW_W + this.camX, y: ((e.clientY - rect.top) / rect.height) * VIEW_H };
+    return { x: ((e.clientX - rect.left) / rect.width) * VIEW_W + this.camX, y: ((e.clientY - rect.top) / rect.height) * VIEW_H + this.camY };
+  }
+
+  /** Where a fixture is drawn on screen in the top-down view (world coordinates). */
+  private fixtureArt(f: Fixture): Rect {
+    const { ox, oy } = ROOMS[f.room];
+    if (f.kind === "wall" && f.plate) return { x: ox + f.plate.x, y: oy + f.plate.y, w: f.plate.w, h: f.plate.h };
+    if (f.kind === "hatch") return f.rect;
+    return { x: f.rect.x, y: f.rect.y - 8, w: f.rect.w, h: f.rect.h + 8 };
+  }
+
+  private fixtureReach(f: Fixture): number {
+    const fp = this.mode === "fp";
+    return f.kind === "terminal" ? (fp ? 22 : 13) : f.kind === "wall" ? (fp ? 30 : 18) : f.kind === "hatch" ? (fp ? 20 : 14) : fp ? 24 : 14;
+  }
+
+  private boardStrip(b: WantedBoard): Rect {
+    const { ox, oy } = ROOMS.shop;
+    return { x: ox + b.plate.x, y: oy + 70, w: b.plate.w, h: 1 };
+  }
+
+  /** Can a body walk the straight line between two points? */
+  private lineClear(x0: number, y0: number, x1: number, y1: number): boolean {
+    const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 3));
+    for (let i = 1; i <= n; i++) {
+      if (isBlocked(x0 + ((x1 - x0) * i) / n, y0 + ((y1 - y0) * i) / n, FLOORS, SOLIDS)) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Click-to-move with a little route finding: every leg that a desk or shelf
+   * blocks is bent into an L (one corner), whichever of the two corners is free.
+   */
+  private walkTo(x: number, y: number, via: Array<{ x: number; y: number }> = []) {
+    const p = this.player;
+    if (!p) return;
+    const path: Array<{ x: number; y: number }> = [];
+    let from = { x: p.x, y: p.y };
+    for (const to of [...via, { x, y }]) {
+      if (!this.lineClear(from.x, from.y, to.x, to.y)) {
+        const corners = [
+          { x: to.x, y: from.y },
+          { x: from.x, y: to.y },
+        ];
+        const corner = corners.find((c) => this.lineClear(from.x, from.y, c.x, c.y) && this.lineClear(c.x, c.y, to.x, to.y));
+        if (corner) path.push(corner);
+        else {
+          // shelves in the way on both corners: go round by the clear lane along the bottom or the top of the room
+          const oy = ROOMS[roomAt(from.x, from.y)].oy;
+          for (const lane of [oy + 252, oy + 80]) {
+            if (this.lineClear(from.x, from.y, from.x, lane) && this.lineClear(from.x, lane, to.x, lane) && this.lineClear(to.x, lane, to.x, to.y)) {
+              path.push({ x: from.x, y: lane }, { x: to.x, y: lane });
+              break;
+            }
+          }
+        }
+      }
+      path.push(to);
+      from = to;
+    }
+    const last = path.pop()!;
+    p.moveTo(last.x, last.y, path);
   }
 
   private handlePointer = (e: PointerEvent) => {
@@ -478,63 +712,102 @@ export class StationGame {
     const p = this.toWorld(e);
     if (!p) return;
     const { x, y } = p;
-    const hit = this.customers.at(x, y);
-    if (hit) {
-      this.callbacks.onInteract({ kind: "customer", buyer: hit.buyer });
-      return;
-    }
-    const inDoor = y >= DOOR.y - 4 && y <= DOOR.y + DOOR.h + 4;
-    if (this.roomId === "vault") {
-      if (inDoor && x >= DOOR.x - 6) {
-        // through the door into the warehouse
-        this.player.moveTo(DOOR_WH_SIDE.x, DOOR_WH_SIDE.y, [DOOR_VAULT_SIDE]);
+    const room = this.roomId;
+    const { ox, oy } = ROOMS[room];
+    const lx = x - ox;
+    const ly = y - oy;
+    if (room === "vault") {
+      const hit = this.customers.at(x, y);
+      if (hit) {
+        this.callbacks.onInteract({ kind: "customer", buyer: hit.buyer });
         return;
       }
+    }
+    // --- doors: walk through to the other side
+    const inDoor = ly >= DOOR.y - 4 && ly <= DOOR.y + DOOR.h + 4;
+    if (room === "vault" && inDoor && lx >= DOOR.x - 6) {
+      this.walkTo(DOOR_WH_SIDE.x, DOOR_WH_SIDE.y, [DOOR_VAULT_SIDE]);
+      return;
+    }
+    if (room === "warehouse" && inDoor && lx <= 14) {
+      this.walkTo(DOOR_VAULT_SIDE.x, DOOR_VAULT_SIDE.y, [DOOR_WH_SIDE]);
+      return;
+    }
+    for (const d of DOOR_LINKS) {
+      if (d.room === room && pointInRect(lx, ly, d.hit)) {
+        this.walkTo(d.to.x, d.to.y, [d.via]);
+        return;
+      }
+    }
+    // --- stock
+    if (room === "warehouse") {
+      const crate = this.warehouse?.crateAt(x, y);
+      if (crate) {
+        this.callbacks.onInteract({ kind: "crate", id: crate.item.unique_name });
+        return;
+      }
+      for (let i = 0; i < RACK.count; i++) {
+        const t = terminalRect(i);
+        if (pointInRect(x, y, { x: t.x, y: t.y - 8, w: t.w, h: t.h + 8 }, 1)) {
+          this.callbacks.onInteract({ kind: "terminal", category: BAYS[i].key });
+          return;
+        }
+      }
+    }
+    if (room === "shop") {
+      const crate = this.shop?.crateAt(x, y);
+      if (crate) {
+        this.callbacks.onInteract({ kind: crate.kind, id: crate.id });
+        return;
+      }
+      for (const b of this.shopData.boards) {
+        if (pointInRect(lx, ly, b.plate, 1)) {
+          this.callbacks.onInteract({ kind: "wish", id: b.id });
+          return;
+        }
+      }
+    }
+    // --- fixtures: use them when in reach, otherwise walk up to them
+    for (const f of FIXTURES) {
+      if (f.room !== room || !pointInRect(x, y, this.fixtureArt(f), 1)) continue;
+      if (distToRect(this.player.x, this.player.y, f.rect) < this.fixtureReach(f)) this.callbacks.onInteract({ kind: "fixture", id: f.id });
+      else this.walkTo(f.use.x, f.use.y);
+      return;
+    }
+    if (room === "vault") {
       if (pointInRect(x, y, TANK_FRAME, 2)) {
         if (distToRect(this.player.x, this.player.y, TANK_SOLID) < INTERACT_RANGE) this.callbacks.onInteract({ kind: "tank" });
-        else this.player.moveTo(clamp(x, TANK_SOLID.x + 6, TANK_SOLID.x + TANK_SOLID.w - 6), TANK_USE.y);
+        else this.walkTo(clamp(x, TANK_SOLID.x + 6, TANK_SOLID.x + TANK_SOLID.w - 6), TANK_USE.y);
         return;
       }
       if (pointInRect(x, y, COUNTER)) {
         // walk to the staff side of the counter
-        this.player.moveTo(clamp(x, COUNTER.x + 6, COUNTER.x + COUNTER.w - 6), COUNTER_SOLID.y - 2);
-        return;
-      }
-      this.player.moveTo(clamp(x, FLOOR.x + 5, FLOOR.x + FLOOR.w - 5), clamp(y, FLOOR.y + 6, FLOOR.y + FLOOR.h - 1));
-      return;
-    }
-    // --- warehouse
-    if (inDoor && x <= WH_OX + 14) {
-      this.player.moveTo(DOOR_VAULT_SIDE.x, DOOR_VAULT_SIDE.y, [DOOR_WH_SIDE]);
-      return;
-    }
-    const crate = this.warehouse?.crateAt(x, y);
-    if (crate) {
-      this.callbacks.onInteract({ kind: "crate", id: crate.item.unique_name });
-      return;
-    }
-    for (let i = 0; i < RACK.count; i++) {
-      const t = terminalRect(i);
-      if (pointInRect(x, y, { x: t.x, y: t.y - 8, w: t.w, h: t.h + 8 }, 1)) {
-        this.callbacks.onInteract({ kind: "terminal", category: BAYS[i].key });
+        this.walkTo(clamp(x, COUNTER.x + 6, COUNTER.x + COUNTER.w - 6), COUNTER_SOLID.y - 2);
         return;
       }
     }
-    this.player.moveTo(clamp(x, WH_FLOOR.x + 5, WH_FLOOR.x + WH_FLOOR.w - 5), clamp(y, WH_FLOOR.y + 6, WH_FLOOR.y + WH_FLOOR.h - 1));
+    this.walkTo(clamp(x, ox + 13, ox + VIEW_W - 13), clamp(y, oy + 76, oy + 261));
   };
 
   private handleHover = (e: PointerEvent) => {
-    if (this.roomId !== "warehouse" || !this.inputEnabled) {
-      this.hover = null;
-      return;
-    }
+    this.hover = null;
+    this.hoverShop = null;
+    if (!this.inputEnabled) return;
     const p = this.toWorld(e);
-    this.hover = p ? (this.warehouse?.crateAt(p.x, p.y) ?? null) : null;
-    if (this.app) this.app.canvas.style.cursor = this.hover ? "pointer" : "";
+    if (p && this.roomId === "warehouse") this.hover = this.warehouse?.crateAt(p.x, p.y) ?? null;
+    if (p && this.roomId === "shop") this.hoverShop = this.shop?.crateAt(p.x, p.y) ?? null;
+    let pointer = this.hover !== null || this.hoverShop !== null;
+    if (p && !pointer) {
+      const { ox, oy } = ROOMS[this.roomId];
+      for (const f of FIXTURES) if (f.room === this.roomId && pointInRect(p.x, p.y, this.fixtureArt(f), 1)) pointer = true;
+      if (this.roomId === "shop") for (const b of this.shopData.boards) if (pointInRect(p.x - ox, p.y - oy, b.plate, 1)) pointer = true;
+    }
+    if (this.app) this.app.canvas.style.cursor = pointer ? "pointer" : "";
   };
 
   private handleLeave = () => {
     this.hover = null;
+    this.hoverShop = null;
   };
 
   // --- first person: click captures the mouse, then clicks interact
@@ -593,10 +866,14 @@ export class StationGame {
       const head = customers.head;
       out.push(this.rectCandidate(head ? { kind: "customer", buyer: head.buyer } : { kind: "counter" }, COUNTER_SOLID, 14, px, py));
       out.push(this.rectCandidate({ kind: "tank" }, TANK_SOLID, fp ? 26 : 16, px, py));
-    } else {
+    } else if (this.roomId === "warehouse") {
       for (const c of this.layoutData.crates) out.push(this.rectCandidate({ kind: "crate", id: c.item.unique_name }, c.rect, fp ? 24 : 15, px, py));
       for (let i = 0; i < RACK.count; i++) out.push(this.rectCandidate({ kind: "terminal", category: BAYS[i].key }, terminalRect(i), fp ? 22 : 13, px, py));
+    } else if (this.roomId === "shop") {
+      for (const c of this.shopData.crates) out.push(this.rectCandidate({ kind: c.kind, id: c.id }, c.rect, fp ? 24 : 15, px, py));
+      for (const b of this.shopData.boards) out.push(this.rectCandidate({ kind: "wish", id: b.id }, this.boardStrip(b), fp ? 30 : 18, px, py));
     }
+    for (const f of FIXTURES) if (f.room === this.roomId) out.push(this.rectCandidate({ kind: "fixture", id: f.id }, f.rect, this.fixtureReach(f), px, py));
     return out;
   }
 
@@ -611,7 +888,11 @@ export class StationGame {
     const list = this.candidates(p.x, p.y).filter((c) => c.dist < c.range);
     if (list.length === 0) return null;
     if (this.mode === "top") {
-      const rank = (c: Candidate) => (c.target.kind === "customer" && c.range > 20 ? 0 : c.target.kind === "tank" ? 2 : c.target.kind === "terminal" ? 4 : c.target.kind === "crate" ? 3 : 1);
+      const rank = (c: Candidate) => {
+        const k = c.target.kind;
+        if (k === "customer") return c.range > 20 ? 0 : 1;
+        return k === "counter" ? 1 : k === "tank" || k === "fixture" ? 2 : k === "crate" || k === "stock" || k === "riven" ? 3 : 4;
+      };
       list.sort((a, b) => rank(a) - rank(b) || a.dist - b.dist);
       return list[0].target;
     }
@@ -637,8 +918,9 @@ export class StationGame {
   private toScreen(wx: number, wy: number, z: number, lift: number): { x: number; y: number } | null {
     if (this.mode === "fp") return this.fp?.project(wx, wy, z) ?? null;
     const x = wx - this.camX;
-    if (x < -4 || x > VIEW_W + 4) return null;
-    return { x, y: wy - lift };
+    const y = wy - this.camY;
+    if (x < -4 || x > VIEW_W + 4 || y < -4 || y > VIEW_H + 24) return null;
+    return { x, y: y - lift };
   }
 
   private placeOrHide(el: HTMLElement, at: { x: number; y: number } | null) {
@@ -672,14 +954,8 @@ export class StationGame {
       player.update(dt, kb?.axis() ?? { ax: 0, ay: 0 });
     }
 
-    // --- which room are we in (with a little hysteresis in the doorway)
-    const nextRoom: RoomId = this.roomId === "vault" ? (player.x > WH_OX + 2 ? "warehouse" : "vault") : player.x < WH_OX - 2 ? "vault" : "warehouse";
-    if (nextRoom !== this.roomId) {
-      this.roomId = nextRoom;
-      this.hover = null;
-      this.applyView();
-      this.callbacks.onRoom?.(nextRoom);
-    }
+    // --- which room are we in
+    this.syncRoom();
 
     // walking past the tank drags a small bow wave along the glass
     if (Math.abs(player.vx) > 5 && player.y < TANK_SOLID.y + TANK_SOLID.h + 40 && player.x > TANK_GLASS.x - 12 && player.x < TANK_GLASS.x + TANK_GLASS.w + 12) {
@@ -707,10 +983,16 @@ export class StationGame {
         fp.setFluid(tank.image);
         fp.render({ x: player.x, y: player.y - 2.5, angle: player.angle }, customers.all, this.time);
       }
-    } else {
+    } else if (this.roomId === "vault") {
       room.update(dt);
+    } else if (this.roomId === "warehouse") {
       warehouse.update(dt);
+    } else if (this.roomId === "bridge") {
+      this.bridge?.update(dt);
+    } else {
+      this.shop?.update(dt);
     }
+    if (!fpMode) this.terminals?.update(dt, this.roomId);
 
     // --- customer name bubbles
     for (const [c, el] of this.bubbles) {
@@ -737,6 +1019,9 @@ export class StationGame {
     this.current = this.inputEnabled ? this.pickTarget() : null;
     const cur = this.current;
     const focus = cur?.kind === "crate" ? this.crateById(cur.id) : !fpMode && this.inputEnabled ? this.hover : null;
+    const shopFocus = cur?.kind === "stock" || cur?.kind === "riven" ? (this.shopData.crates.find((c) => c.kind === cur.kind && c.id === cur.id) ?? null) : !fpMode && this.inputEnabled ? this.hoverShop : null;
+    const board = cur?.kind === "wish" ? (this.shopData.boards.find((b) => b.id === cur.id) ?? null) : null;
+    let lifted = 0;
     if (focus) {
       const i = focus.item;
       this.labels.text(this.elCrate, `${i.name}${i.quantity > 1 ? ` x${i.quantity}` : ""} · ${focus.listed ? "LISTED · " : ""}${i.basis === "exact" ? "" : "~"}${fmt(i.total)}p`);
@@ -745,25 +1030,65 @@ export class StationGame {
       const cx = focus.rect.x + focus.rect.w / 2;
       const at = fpMode ? this.toScreen(cx, focus.rect.y + focus.rect.h / 2, crateTop(focus.shape.h) + 6, 0) : this.toScreen(cx, focus.rect.y, 0, crateLift(focus.shape.h) + 4);
       this.placeOrHide(this.elCrate, at ?? (fpMode ? { x: VIEW_W / 2, y: VIEW_H - 62 } : null));
+      lifted = crateLift(focus.shape.h);
+    } else if (shopFocus) {
+      const c = shopFocus;
+      this.labels.text(this.elCrate, `${c.name}${c.quantity > 1 ? ` x${c.quantity}` : ""} · ${c.hidden ? "hidden" : statusText(c.status)} · ${c.listPrice ? `${fmt(c.listPrice)}p` : "no price yet"}`);
+      const color = c.hidden ? "#8d89b8" : statusCss(c.status);
+      if (this.elCrate.style.borderColor !== color) this.elCrate.style.borderColor = color;
+      const cx = c.rect.x + c.rect.w / 2;
+      const at = fpMode ? this.toScreen(cx, c.rect.y + c.rect.h / 2, crateTop(c.shape.h) + 6, 0) : this.toScreen(cx, c.rect.y, 0, crateLift(c.shape.h) + 4);
+      this.placeOrHide(this.elCrate, at ?? (fpMode ? { x: VIEW_W / 2, y: VIEW_H - 62 } : null));
+      lifted = crateLift(c.shape.h);
+    } else if (board) {
+      this.labels.text(this.elCrate, `Wanted: ${board.name}${board.quantity > 1 ? ` x${board.quantity}` : ""} · ${board.hidden ? "hidden" : statusText(board.status)}${board.maxPrice !== null ? ` · max ${fmt(board.maxPrice)}p` : ""}`);
+      const color = board.hidden ? "#8d89b8" : statusCss(board.status);
+      if (this.elCrate.style.borderColor !== color) this.elCrate.style.borderColor = color;
+      const bx = ROOMS.shop.ox + board.plate.x + board.plate.w / 2;
+      const at = fpMode ? this.toScreen(bx, ROOMS.shop.oy + 70, 18, 0) : { x: clamp(bx - this.camX, 40, VIEW_W - 40), y: board.plate.y + board.plate.h + 14 };
+      this.placeOrHide(this.elCrate, at ?? (fpMode ? { x: VIEW_W / 2, y: VIEW_H - 62 } : null));
     } else {
       this.labels.show(this.elCrate, false);
     }
     if (cur) {
-      const text =
-        cur.kind === "tank"
-          ? "Vault"
-          : cur.kind === "counter"
-            ? "Counter"
-            : cur.kind === "customer"
-              ? `Serve ${cur.buyer.name}`
-              : cur.kind === "crate"
-                ? focus?.listed
-                  ? "Listed"
-                  : "List for sale"
-                : `${BAYS.find((b) => b.key === cur.category)?.label ?? "Bay"} terminal`;
+      let text: string;
+      switch (cur.kind) {
+        case "tank":
+          text = "Vault";
+          break;
+        case "counter":
+          text = "Counter";
+          break;
+        case "customer":
+          text = `Serve ${cur.buyer.name}`;
+          break;
+        case "crate":
+          text = focus?.listed ? "Listed" : "List for sale";
+          break;
+        case "terminal":
+          text = `${BAYS.find((b) => b.key === cur.category)?.label ?? "Bay"} terminal`;
+          break;
+        case "stock":
+          text = "Sell or edit";
+          break;
+        case "riven":
+          text = "Riven: sell or edit";
+          break;
+        case "wish":
+          text = "Buy order";
+          break;
+        case "fixture":
+          text = cur.id === "lever" ? (this.trader.running ? "Stop the trader" : "Start the trader") : fixtureById(cur.id).prompt;
+          break;
+      }
       this.labels.text(this.elPrompt, text);
       if (fpMode) this.labels.place(this.elPrompt, VIEW_W / 2, VIEW_H - 34);
-      else this.labels.place(this.elPrompt, clamp(player.x - this.camX, 20, VIEW_W - 20), player.y - (focus ? 34 + crateLift(focus.shape.h) : 24));
+      else {
+        // a console or desk is right above the player: put the prompt under their feet so it does not cover it
+        const kind = cur.kind === "fixture" ? fixtureById(cur.id).kind : "";
+        const under = kind === "lever" || kind === "desk";
+        this.labels.place(this.elPrompt, clamp(player.x - this.camX, 20, VIEW_W - 20), under ? player.y - this.camY + 17 : Math.max(14, player.y - this.camY - (lifted ? 34 + lifted : 24)));
+      }
     }
     this.labels.show(this.elPrompt, cur !== null);
     this.stage.classList.toggle("vt-station-stage-target", fpMode && cur !== null);

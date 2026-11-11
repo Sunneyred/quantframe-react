@@ -1,17 +1,29 @@
 import { CHAR_ART, paintCharacter, type CharacterPalette, type Dir } from "../entities/character";
 import {
+  BR_FLOOR,
   COUNTER_SOLID,
   CORRIDOR,
+  CORRIDOR_LOW,
+  CORRIDOR_SV,
+  CORRIDOR_SW,
+  FIXTURES,
   FLOOR,
   PAL,
   QUEUE_SLOTS,
   RACK,
+  ROW_H,
+  SHOP_FLOOR,
+  SHOP_RACK,
   TANK_SOLID,
   WH_FLOOR,
+  WH_OX,
   WORLD_H,
   WORLD_W,
+  fixtureById,
   queueSlot,
   rackRect,
+  rivenCaseRect,
+  shopRackRect,
   terminalRect,
   type Rect,
 } from "../engine/constants";
@@ -198,12 +210,26 @@ export function floorTex(): Tex {
   // fill a little past the edges so no void shows at the foot of the walls
   tiles({ x: FLOOR.x - 8, y: FLOOR.y - 8, w: FLOOR.w + 16, h: FLOOR.h + 16 });
   tiles({ x: WH_FLOOR.x - 8, y: WH_FLOOR.y - 8, w: WH_FLOOR.w + 16, h: WH_FLOOR.h + 16 });
-  // door threshold
-  p.rect(CORRIDOR.x, CORRIDOR.y - 2, CORRIDOR.w, CORRIDOR.h + 2, PAL.metalDark);
-  for (let x = CORRIDOR.x; x < CORRIDOR.x + CORRIDOR.w; x += 4) p.rect(x, CORRIDOR.y - 2, 2, CORRIDOR.h + 2, PAL.metal);
-  p.rect(CORRIDOR.x, CORRIDOR.y + 15, CORRIDOR.w, 2, PAL.cyan, true);
-  p.tint(CORRIDOR.x - 24, CORRIDOR.y, 24, CORRIDOR.h, PAL.cyan, 0.12);
-  p.tint(CORRIDOR.x + CORRIDOR.w, CORRIDOR.y, 24, CORRIDOR.h, PAL.cyan, 0.12);
+  tiles({ x: BR_FLOOR.x - 8, y: BR_FLOOR.y - 8, w: BR_FLOOR.w + 16, h: BR_FLOOR.h + 16 });
+  tiles({ x: SHOP_FLOOR.x - 8, y: SHOP_FLOOR.y - 8, w: SHOP_FLOOR.w + 16, h: SHOP_FLOOR.h + 16 });
+  // door thresholds between rooms on the same row
+  for (const c of [CORRIDOR, CORRIDOR_LOW]) {
+    p.rect(c.x, c.y - 2, c.w, c.h + 2, PAL.metalDark);
+    for (let x = c.x; x < c.x + c.w; x += 4) p.rect(x, c.y - 2, 2, c.h + 2, PAL.metal);
+    p.rect(c.x, c.y + 15, c.w, 2, PAL.cyan, true);
+    p.tint(c.x - 24, c.y, 24, c.h, PAL.cyan, 0.12);
+    p.tint(c.x + c.w, c.y, 24, c.h, PAL.cyan, 0.12);
+  }
+  // the two passages between the rows: grated deck with a light line down the middle
+  for (const c of [CORRIDOR_SV, CORRIDOR_SW]) {
+    const y0 = 262;
+    const y1 = ROW_H + 70;
+    p.rect(c.x - 4, y0, c.w + 8, y1 - y0, PAL.metalDark);
+    for (let y = y0; y < y1; y += 4) p.rect(c.x - 4, y, c.w + 8, 2, PAL.metal);
+    p.rect(c.x + c.w / 2 - 1, y0, 2, y1 - y0, PAL.cyan, true);
+    p.tint(c.x, y0 - 22, c.w, 22, PAL.cyan, 0.12);
+    p.tint(c.x, y1, c.w, 22, PAL.cyan, 0.12);
+  }
   // diamond inlay in the vault
   const cx = 236;
   const cy = 198;
@@ -234,6 +260,37 @@ export function floorTex(): Tex {
     const t = terminalRect(i);
     p.tint(t.x - 4, t.y + t.h, t.w + 8, 5, PAL.cyan, 0.16);
   }
+  // --- shop floor: aisle lines by the shelves, a gold diamond in the open floor
+  for (let i = 0; i <= SHOP_RACK.count; i++) {
+    const r = i < SHOP_RACK.count ? shopRackRect(i) : rivenCaseRect();
+    p.tint(r.x - 3, r.y, 1, r.h, PAL.gold, 0.35);
+    p.tint(r.x + r.w + 2, r.y, 1, r.h, PAL.gold, 0.35);
+  }
+  const diamond = (dx: number, dy: number, rx: number, ry: number, hex: number, a: number) => {
+    for (let i = 0; i <= rx; i++) {
+      const off = Math.round(ry * (1 - i / rx));
+      for (const sx of [-1, 1]) for (const sy of [-1, 1]) p.tint(dx + sx * i, dy + sy * off, 1, 1, hex, a);
+    }
+  };
+  diamond(WH_OX + 406, ROW_H + 150, 36, 22, PAL.gold, 0.55);
+  diamond(WH_OX + 406, ROW_H + 150, 20, 12, PAL.gold, 0.4);
+  // --- control deck: compass inlay, the pad at the lever, the maintenance hatch
+  diamond(238, ROW_H + 176, 44, 26, PAL.cyan, 0.45);
+  diamond(238, ROW_H + 176, 24, 14, PAL.gold, 0.45);
+  const lv = fixtureById("lever").rect;
+  p.rect(lv.x + 6, lv.y + lv.h + 6, lv.w - 12, 1, PAL.gold, true);
+  p.tint(lv.x, lv.y + lv.h, lv.w, 6, 0x35e0b4, 0.14);
+  const h = fixtureById("hatch").rect;
+  p.rect(h.x - 1, h.y - 1, h.w + 2, h.h + 2, PAL.goldDark);
+  p.rect(h.x, h.y, h.w, h.h, PAL.metalDark);
+  for (let x = h.x; x < h.x + h.w; x += 4) {
+    p.rect(x, h.y, 2, 3, PAL.gold, true);
+    p.rect(x + 2, h.y + h.h - 3, 2, 3, PAL.gold, true);
+  }
+  p.rect(h.x + 3, h.y + 4, h.w - 6, h.h - 8, PAL.metal);
+  p.rect(h.x + h.w / 2 - 3, h.y + h.h / 2 - 1, 6, 2, PAL.metalLight);
+  // a pool of light in front of every terminal
+  for (const f of FIXTURES) if (f.kind === "terminal") p.tint(f.rect.x - 4, f.rect.y + f.rect.h, f.rect.w + 8, 5, PAL.cyan, 0.16);
   return p.tex();
 }
 
@@ -361,6 +418,113 @@ export function crateTexSets(): CrateTexSet[] {
   return [dim, cyan, gold, bright, listed];
 }
 export const crateTexIndex = (tier: Tier, listed: boolean) => (listed ? 4 : tier);
+
+const tintedCache = new Map<string, CrateTexSet>();
+/** A shelf crate in one colour (a stock status), cached. `dim` is the look of a hidden entry. */
+export function tintedCrateTex(color: number, dim = false, card = false): CrateTexSet {
+  const key = `${color}:${dim ? 1 : 0}:${card ? 1 : 0}`;
+  let set = tintedCache.get(key);
+  if (!set) {
+    const body = dim ? 0x24223f : mix(mix(color, 0x000000, 0.62), 0x2b2a4d, 0.35);
+    const light = dim ? 0x34325a : mix(mix(color, 0x000000, 0.42), 0x45447a, 0.35);
+    const dark = dim ? PAL.metalDark : mix(color, 0x000000, 0.8);
+    const band = dim ? mix(0x4a4873, color, 0.35) : color;
+    const side = crateBase(body, light, dark);
+    side.rect(1, 4, 14, 3, band, !dim);
+    side.rect(1, 4, 14, 1, mix(band, 0xffffff, 0.3), !dim);
+    side.rect(7, 8, 2, 2, band, !dim);
+    if (card) {
+      // riven card on the front
+      side.rect(5, 2, 6, 8, 0x2a1a55);
+      side.rect(6, 3, 4, 6, 0xb388ff, true);
+      side.rect(7, 5, 2, 2, 0xf3e8ff, true);
+    }
+    const top = new Paint(8, 8, rgb(light));
+    top.rect(0, 0, 8, 1, band, !dim);
+    top.rect(0, 7, 8, 1, band, !dim);
+    top.rect(0, 0, 1, 8, band, !dim);
+    top.rect(7, 0, 1, 8, band, !dim);
+    top.rect(3, 3, 2, 2, card ? 0xf3e8ff : band, !dim);
+    set = { side: side.tex(), top: top.tex() };
+    if (tintedCache.size > 80) tintedCache.clear();
+    tintedCache.set(key, set);
+  }
+  return set;
+}
+
+/** The trader console: lamps along the front, the lever slot on top. */
+export function leverTex(on: boolean, beat: boolean): { side: Tex; top: Tex } {
+  const side = new Paint(48, 16, rgb(PAL.metalDark));
+  side.rect(0, 0, 48, 2, PAL.gold, true);
+  side.rect(0, 2, 48, 1, PAL.goldDark);
+  side.rect(0, 3, 2, 13, PAL.goldDark);
+  side.rect(46, 3, 2, 13, PAL.goldDark);
+  for (let i = 0; i < 9; i++) {
+    const lit = on ? (i + (beat ? 1 : 0)) % 3 !== 0 : i === 0 && beat;
+    side.rect(5 + i * 4.5, 7, 3, 3, on ? (lit ? 0x3ddcb0 : 0x0f5a4c) : lit ? 0xff4d6d : PAL.metal, lit);
+  }
+  side.rect(8, 12, 32, 1, on ? 0x35e0b4 : PAL.cyanDark, on);
+  const top = new Paint(48, 16, rgb(PAL.metalLight));
+  top.rect(2, 2, 44, 12, PAL.metal);
+  top.rect(0, 0, 48, 1, PAL.goldLight);
+  top.rect(4, 4, 10, 8, on ? PAL.cyanDark : 0x24223f, on);
+  top.rect(34, 4, 10, 8, on ? 0x0f5a4c : 0x3a1420);
+  top.rect(36, 7, 4, 2, on ? 0x35e0b4 : 0xff4d6d, true);
+  top.rect(21, 2, 6, 12, PAL.void);
+  top.rect(23, 3, 2, 10, PAL.goldDeep);
+  top.rect(20, on ? 2 : 9, 8, 5, on ? 0x35e0b4 : PAL.gold, true);
+  return { side: side.tex(), top: top.tex() };
+}
+
+/** The lever handle, as a small billboard standing on the console. */
+export function leverHandleTex(on: boolean): Tex {
+  const p = new Paint(8, 14, 0);
+  p.rect(3, 5, 2, 9, PAL.goldDark);
+  p.rect(0, 0, 8, 6, on ? 0x35e0b4 : PAL.gold, true);
+  p.rect(0, 0, 8, 1, on ? 0xeafff6 : PAL.goldLight, true);
+  p.rect(0, 5, 8, 1, on ? 0x0f5a4c : PAL.goldDark);
+  return p.tex();
+}
+
+export function deskTex(): { side: Tex; top: Tex } {
+  const side = new Paint(56, 15, rgb(PAL.metalDark));
+  side.rect(0, 0, 56, 2, PAL.gold, true);
+  side.rect(0, 2, 56, 1, PAL.goldDark);
+  side.rect(6, 6, 44, 1, PAL.gold, true);
+  side.rect(0, 3, 2, 12, PAL.goldDark);
+  side.rect(54, 3, 2, 12, PAL.goldDark);
+  const top = new Paint(56, 16, rgb(PAL.metalLight));
+  top.rect(2, 2, 52, 12, PAL.metal);
+  top.rect(0, 0, 56, 1, PAL.goldLight);
+  top.rect(6, 4, 14, 8, 0x221c52);
+  top.rect(7, 6, 8, 1, PAL.goldDark);
+  top.rect(7, 9, 11, 1, PAL.goldDark);
+  top.rect(34, 3, 16, 9, PAL.void);
+  top.rect(35, 4, 14, 7, PAL.cyanDark, true);
+  for (let i = 0; i < 4; i++) top.rect(36 + i * 3, 10 - [2, 4, 3, 5][i], 2, [2, 4, 3, 5][i], PAL.cyanLight, true);
+  return { side: side.tex(), top: top.tex() };
+}
+
+/** Deck of the riven display case. */
+export function caseTex(rows: number, rowPitch: number): { side: Tex; top: Tex } {
+  const side = new Paint(8, 4, rgb(PAL.metalDark));
+  side.rect(0, 0, 8, 1, 0xb388ff, true);
+  const h = rows * rowPitch;
+  const top = new Paint(40, h, rgb(PAL.metalDark));
+  top.rect(1, 1, 38, h - 2, 0x1a1436);
+  top.rect(19, 0, 2, h, PAL.metal);
+  top.rect(0, 0, 40, 1, 0xb388ff, true);
+  top.rect(0, h - 1, 40, 1, 0xb388ff, true);
+  for (let r = 0; r < rows; r++) {
+    const y = r * rowPitch;
+    top.rect(0, y, 40, 1, PAL.metal);
+    for (const x of [1, 23]) {
+      top.rect(x, y + 11, 16, 1, 0x6a4fb8);
+      top.rect(x, y + 24, 16, 1, 0x6a4fb8);
+    }
+  }
+  return { side: side.tex(), top: top.tex() };
+}
 
 export function rackTex(): { side: Tex; top: Tex } {
   const side = new Paint(8, 4, rgb(PAL.metalDark));

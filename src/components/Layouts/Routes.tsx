@@ -3,6 +3,7 @@ import { useAuthContext } from "@contexts/auth.context";
 import { lazy } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { routeLoaders } from "./routeLoaders";
+import { StationStartGate } from "../../station/StartGate";
 
 // Layouts
 import { CleanLayout } from "./Clean";
@@ -52,7 +53,7 @@ const CleanPage = lazy(routeLoaders.clean);
 const WfInventoryPage = lazy(routeLoaders.wfInventory);
 
 // Void Trader: the walk-around station
-const PStation = lazy(() => import("../../station/StationPage"));
+const PStation = lazy(() => import("../../station/StationSafe"));
 
 export function AppRoutes() {
   const { app_error } = useAppContext();
@@ -94,7 +95,14 @@ export function AppRoutes() {
             </Route>
             <Route path="/" element={<LogInLayout />}>
               <Route element={<AuthenticatedGate goTo="/auth/login" />}>
-                <Route path="/" element={<PHome />} />
+                <Route
+                  path="/"
+                  element={
+                    <StationStartGate>
+                      <PHome />
+                    </StationStartGate>
+                  }
+                />
                 <Route path="station" element={<PStation />} />
                 <Route path="debug">
                   <Route index element={<PDebug />} />

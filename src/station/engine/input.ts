@@ -19,25 +19,31 @@ function isTyping(target: EventTarget | null): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
 }
 
+/** True while an app dialog (confirm prompt, details modal) is open on top of the station. */
+export const dialogOpen = (): boolean => document.querySelector(".mantine-Modal-content, .mantine-Drawer-content") !== null;
+
+export { isTyping };
+
 export class Keyboard {
   private down = new Set<string>();
   enabled = true;
 
-  constructor(private onPress: (code: string) => void) {
+  constructor(private onPress: (code: string, key: string) => void) {
     window.addEventListener("keydown", this.handleDown);
     window.addEventListener("keyup", this.handleUp);
     window.addEventListener("blur", this.clear);
   }
 
   private handleDown = (e: KeyboardEvent) => {
-    if (!this.enabled || e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
+    if (!this.enabled || e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target) || dialogOpen()) return;
     if (e.code in MOVE_KEYS) {
       this.down.add(e.code);
       e.preventDefault(); // arrows would scroll the page
       return;
     }
-    if (e.code === "Tab") e.preventDefault(); // Tab is the quick panel, not focus traversal
-    if (!e.repeat) this.onPress(e.code);
+    // Tab is the quick panel, not focus traversal; the overlay keys must not also type into the field they open
+    if (e.code === "Tab" || e.code === "KeyK" || e.code === "Slash" || e.code === "KeyM" || e.code === "KeyH") e.preventDefault();
+    if (!e.repeat) this.onPress(e.code, e.key);
   };
 
   private handleUp = (e: KeyboardEvent) => {

@@ -1,5 +1,5 @@
 import { Badge, Button, Card, Group, Progress, Stack, Text } from "@mantine/core";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { copyText } from "../data/bridge";
 import { inviteCommand, whisperCommand, type Buyer, type GoalSnapshot } from "../engine/logic";
 
@@ -22,7 +22,8 @@ function CopyCommand({ label, command }: { label: string; command: string }) {
   );
 }
 
-export function CustomerCard({ buyer, onDone }: { buyer: Buyer; onDone: () => void }) {
+/** `children` is the "record the sale" section, when there is stock to sell from. */
+export function CustomerCard({ buyer, onDone, children }: { buyer: Buyer; onDone: () => void; children?: ReactNode }) {
   const cmdName = buyer.commandName;
   return (
     <Card className="vt-station-card" p="md" data-station-card="customer">
@@ -74,6 +75,7 @@ export function CustomerCard({ buyer, onDone }: { buyer: Buyer; onDone: () => vo
             The event did not include this player's in-game name, so there is no command to copy. Open Chat to reply.
           </Text>
         )}
+        {children}
         <Group justify="flex-end" mt="xs">
           <Button variant="default" size="xs" onClick={onDone} data-station-done>
             Done, send them off (Esc)

@@ -1,6 +1,7 @@
 import { Container, Graphics } from "pixi.js";
 import { DOOR, PAL, RACK, VIEW_H, VIEW_W, WH_DISPLAY, WH_FLOOR, WH_OX, rackPosts, rackRect, terminalRect } from "./constants";
 import type { LabelLayer } from "./labels";
+import { drawSouthDoor } from "./shell";
 import { LISTED_CSS, TIER_CSS, type Crate, type WarehouseLayout } from "./warehouse";
 
 const fmt = (n: number) => Math.round(n).toLocaleString();
@@ -155,6 +156,9 @@ export class WarehouseRoom {
     g.rect(ox + 7, DOOR.y, 1, DOOR.h).fill(PAL.cyan);
     g.rect(ox + 8, DOOR.y + 2, 10, DOOR.h - 4).fill({ color: PAL.cyan, alpha: 0.16 });
     g.rect(ox + 18, DOOR.y + 6, 12, DOOR.h - 12).fill({ color: PAL.cyan, alpha: 0.08 });
+
+    // --- door down to the Shop Floor
+    drawSouthDoor(g, ox, 0);
 
     // --- racks: a low pallet deck with a spine, a marked slot per crate and four uprights
     for (let i = 0; i < RACK.count; i++) {

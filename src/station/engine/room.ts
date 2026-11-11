@@ -1,5 +1,6 @@
 import { Container, Graphics } from "pixi.js";
 import { COUNTER, COUNTER_BELL, CRATES, DOOR, FLOOR, PAL, QUEUE_SLOTS, VIEW_H, VIEW_W, queueSlot } from "./constants";
+import { drawSouthDoor } from "./shell";
 
 /** Wall-mounted readout next to the tank. DOM labels are laid over this plate. */
 export const READOUT = { x: 158, y: 18, w: 112, h: 42 };
@@ -162,6 +163,9 @@ export class Room {
     g.rect(DOOR.x - 1, DOOR.y - 3, DOOR.w + 1, DOOR.h + 6).fill(PAL.gold);
     g.rect(DOOR.x, DOOR.y, DOOR.w, DOOR.h).fill(0x02020a);
     g.rect(DOOR.x, DOOR.y, 1, DOOR.h).fill(PAL.cyan);
+
+    // --- door down to the Control Deck
+    drawSouthDoor(g, 0, 0);
 
     // --- crates
     for (const c of CRATES) {

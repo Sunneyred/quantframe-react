@@ -1,5 +1,7 @@
 import type { SellCandidate, SellFinderResult } from "@api/wf_inventory";
+import type { TauriTypes } from "$types";
 import { progressOf, type Buyer, type GoalSnapshot } from "../engine/logic";
+import type { ShopData, StockItem, StockRiven, WishItem } from "../engine/shop";
 
 /**
  * Everything the station needs from the Tauri backend, wrapped so the page
@@ -153,7 +155,7 @@ export function demoFailNextListing() {
 }
 
 /** Dev switches for the standalone page: `?offline` shows the not-connected state, `?many` overfills the mods bay. */
-const demoFlag = (name: string): boolean => {
+export const demoFlag = (name: string): boolean => {
   try {
     return new URLSearchParams(window.location.search).has(name);
   } catch {
@@ -261,6 +263,280 @@ export async function listForSale(item: SellCandidate, quantity: number): Promis
 }
 
 // ---------------------------------------------------------------------------
+// Shop Floor (stock items, stock rivens, wish list): the same commands the
+// Live Trading tabs call. Outside Tauri everything works on demo rows.
+// ---------------------------------------------------------------------------
+
+const SHOP_LIMIT = 200;
+const now = () => new Date().toISOString();
+
+type DemoStock = [name: string, owned: number, bought: number, list: number | null, status: string, min?: number, hidden?: boolean];
+const DEMO_STOCK: DemoStock[] = [
+  ["Glaive Prime Set", 1, 110, 165, "live"],
+  ["Nova Prime Set", 2, 48, 78, "live"],
+  ["Kronen Prime Set", 1, 60, 92, "live", 80],
+  ["Mesa Prime Systems Blueprint", 1, 0, 55, "live"],
+  ["Primed Continuity", 1, 40, 62, "pending"],
+  ["Arcane Energize", 3, 20, 34, "live"],
+  ["Blind Rage", 4, 6, 12, "to_low_profit"],
+  ["Rhino Prime Chassis Blueprint", 1, 12, 22, "order_limit"],
+  ["Maiming Strike", 1, 30, 48, "overpriced"],
+  ["Narrow Minded", 2, 9, null, "no_sellers"],
+  ["Akstiletto Prime Barrel", 6, 4, 9, "underpriced"],
+  ["Vigilante Armaments", 27, 1, null, "inactive", undefined, true],
+  ["Ayatan Anasa Sculpture", 4, 5, 9, "no_buyers"],
+  ["Legendary Fusion Core", 1, 150, 210, "sma_limit"],
+];
+const slugOf = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+let demoId = 1;
+let demoItems: StockItem[] = DEMO_STOCK.map(([name, owned, bought, list, status, min, hidden]) => ({
+  id: demoId++,
+  item_name: name,
+  item_unique_name: `/Demo/${slugOf(name)}`,
+  wfm_id: slugOf(name),
+  wfm_url: slugOf(name),
+  owned,
+  bought,
+  list_price: list ?? undefined,
+  status: status as TauriTypes.StockStatus,
+  is_hidden: Boolean(hidden),
+  created_at: now(),
+  updated_at: now(),
+  price_history: [],
+  properties: min ? { min_price: min } : {},
+}));
+let demoRivens: StockRiven[] = (
+  [
+    ["Rubico", "Critacan", 320, 450, "live", 12, 8],
+    ["Kronen", "Visi-toxitis", 90, 140, "live", 9, 3],
+    ["Soma", "Argi-satitron", 60, null, "pending", 10, 0],
+  ] as Array<[string, string, number, number | null, string, number, number]>
+).map(
+  ([weapon, mod, bought, list, status, mr, rolls]) =>
+    ({
+      id: demoId++,
+      weapon_name: weapon,
+      mod_name: mod,
+      weapon_type: "rifle",
+      weapon_unique_name: `/Demo/${slugOf(weapon)}`,
+      wfm_weapon_id: slugOf(weapon),
+      wfm_weapon_url: slugOf(weapon),
+      wfm_order_id: "",
+      bought,
+      list_price: list ?? undefined,
+      status: status as TauriTypes.StockStatus,
+      is_hidden: false,
+      mastery_rank: mr,
+      re_rolls: rolls,
+      polarity: "madurai",
+      comment: "",
+      attributes: [],
+      filter: { enabled: false },
+      sub_type: { rank: 8 },
+      created_at: now(),
+      updated_at: now(),
+      price_history: [],
+      properties: {},
+    }) as StockRiven,
+);
+let demoWishes: WishItem[] = (
+  [
+    ["Primed Flow", 1, 70, 64, "live"],
+    ["Arcane Grace", 2, 18, null, "no_sellers"],
+    ["Wisp Prime Set", 1, 120, 104, "live"],
+    ["Adaptation", 1, 25, null, "pending"],
+  ] as Array<[string, number, number, number | null, string]>
+).map(([name, quantity, max, list, status]) => ({
+  id: demoId++,
+  item_name: name,
+  wfm_url: slugOf(name),
+  quantity,
+  bought: 0,
+  list_price: list ?? undefined,
+  status: status as TauriTypes.StockStatus,
+  is_hidden: false,
+  created_at: now(),
+  updated_at: now(),
+  price_history: [],
+  properties: { max_price: max },
+}));
+
+const demoDelay = (ms = 250) => new Promise((r) => setTimeout(r, ms));
+function requireDemo() {
+  if (isTauri()) throw new Error("The app backend is not available.");
+}
+
+/** Read everything the Shop Floor shows. Never throws: a failed read comes back empty with `error` set. */
+export async function fetchShop(): Promise<ShopData> {
+  const mod = await loadApi();
+  if (!mod) {
+    await demoDelay(40);
+    const empty = demoFlag("emptyshop");
+    return {
+      items: empty ? [] : demoItems.map((i) => ({ ...i })),
+      rivens: empty ? [] : demoRivens.map((i) => ({ ...i })),
+      wishes: empty ? [] : demoWishes.map((i) => ({ ...i })),
+      totalItems: empty ? 0 : demoItems.length,
+      totalRivens: empty ? 0 : demoRivens.length,
+      totalWishes: empty ? 0 : demoWishes.length,
+      demo: true,
+    };
+  }
+  const out: ShopData = { items: [], rivens: [], wishes: [], totalItems: 0, totalRivens: 0, totalWishes: 0, demo: false };
+  const errors: string[] = [];
+  const api = mod.default;
+  await Promise.all([
+    api.stock_item
+      .getPagination({ page: 1, limit: SHOP_LIMIT })
+      .then((r) => {
+        out.items = r.results ?? [];
+        out.totalItems = r.total ?? out.items.length;
+      })
+      .catch((e) => errors.push(errorText(e))),
+    api.stock_riven
+      .getPagination({ page: 1, limit: SHOP_LIMIT })
+      .then((r) => {
+        out.rivens = r.results ?? [];
+        out.totalRivens = r.total ?? out.rivens.length;
+      })
+      .catch((e) => errors.push(errorText(e))),
+    api.wish_list
+      .getPagination({ page: 1, limit: SHOP_LIMIT })
+      .then((r) => {
+        out.wishes = r.results ?? [];
+        out.totalWishes = r.total ?? out.wishes.length;
+      })
+      .catch((e) => errors.push(errorText(e))),
+  ]);
+  if (errors.length > 0) out.error = errors[0];
+  return out;
+}
+
+/** "Sell" on a stock row: records the sale and takes the copies out of stock. Throws with the backend's reason. */
+export async function sellStockItem(item: StockItem, price: number, quantity: number): Promise<void> {
+  const mod = await loadApi();
+  if (!mod) {
+    requireDemo();
+    await demoDelay();
+    const it = demoItems.find((i) => i.id === item.id);
+    if (!it) throw new Error("Demo: that item is no longer in stock.");
+    it.owned -= quantity;
+    if (it.owned <= 0) demoItems = demoItems.filter((i) => i.id !== item.id);
+    demoSale(price * quantity);
+    return;
+  }
+  // same payload as the manual sell prompt in Live Trading > Items
+  await mod.default.stock_item.sell({ id: item.id, wfm_url: item.wfm_url, sub_type: item.sub_type, price, quantity });
+}
+
+export async function updateStockItem(input: TauriTypes.UpdateStockItem): Promise<void> {
+  const mod = await loadApi();
+  if (!mod) {
+    requireDemo();
+    await demoDelay();
+    const it = demoItems.find((i) => i.id === input.id);
+    if (!it) throw new Error("Demo: that item is no longer in stock.");
+    if (input.owned !== undefined) it.owned = input.owned;
+    if (input.bought !== undefined) it.bought = input.bought;
+    if (input.is_hidden !== undefined) it.is_hidden = input.is_hidden;
+    if (input.properties) it.properties = { ...it.properties, ...input.properties };
+    return;
+  }
+  await mod.default.stock_item.update(input);
+}
+
+export async function deleteStockItem(id: number): Promise<void> {
+  const mod = await loadApi();
+  if (!mod) {
+    requireDemo();
+    await demoDelay();
+    demoItems = demoItems.filter((i) => i.id !== id);
+    return;
+  }
+  await mod.default.stock_item.delete(id);
+}
+
+export async function sellStockRiven(riven: StockRiven, price: number): Promise<void> {
+  const mod = await loadApi();
+  if (!mod) {
+    requireDemo();
+    await demoDelay();
+    demoRivens = demoRivens.filter((i) => i.id !== riven.id);
+    demoSale(price);
+    return;
+  }
+  // same payload as Live Trading > Rivens
+  await mod.default.stock_riven.sell({ ...riven, wfm_url: riven.wfm_weapon_url, rank: riven.sub_type?.rank || 0, price });
+}
+
+export async function updateStockRiven(input: TauriTypes.UpdateStockRiven): Promise<void> {
+  const mod = await loadApi();
+  if (!mod) {
+    requireDemo();
+    await demoDelay();
+    const it = demoRivens.find((i) => i.id === input.id);
+    if (!it) throw new Error("Demo: that riven is no longer in stock.");
+    if (input.bought !== undefined) it.bought = input.bought;
+    if (input.is_hidden !== undefined) it.is_hidden = input.is_hidden;
+    if (input.properties) it.properties = { ...it.properties, ...input.properties };
+    return;
+  }
+  await mod.default.stock_riven.update(input);
+}
+
+export async function deleteStockRiven(id: number): Promise<void> {
+  const mod = await loadApi();
+  if (!mod) {
+    requireDemo();
+    await demoDelay();
+    demoRivens = demoRivens.filter((i) => i.id !== id);
+    return;
+  }
+  await mod.default.stock_riven.delete(id);
+}
+
+/** "Bought" on a wish list row: records the purchase. */
+export async function boughtWish(wish: WishItem, price: number, quantity: number): Promise<void> {
+  const mod = await loadApi();
+  if (!mod) {
+    requireDemo();
+    await demoDelay();
+    const it = demoWishes.find((i) => i.id === wish.id);
+    if (!it) throw new Error("Demo: that entry is no longer on the wish list.");
+    it.quantity -= quantity;
+    if (it.quantity <= 0) demoWishes = demoWishes.filter((i) => i.id !== wish.id);
+    return;
+  }
+  await mod.default.wish_list.bought({ id: wish.id, wfm_url: wish.wfm_url, sub_type: wish.sub_type, price, quantity });
+}
+
+export async function updateWish(input: TauriTypes.UpdateWishListItem): Promise<void> {
+  const mod = await loadApi();
+  if (!mod) {
+    requireDemo();
+    await demoDelay();
+    const it = demoWishes.find((i) => i.id === input.id);
+    if (!it) throw new Error("Demo: that entry is no longer on the wish list.");
+    if (input.quantity !== undefined) it.quantity = input.quantity;
+    if (input.is_hidden !== undefined) it.is_hidden = input.is_hidden;
+    if (input.properties) it.properties = { ...it.properties, ...input.properties };
+    return;
+  }
+  await mod.default.wish_list.update(input);
+}
+
+export async function deleteWish(id: number): Promise<void> {
+  const mod = await loadApi();
+  if (!mod) {
+    requireDemo();
+    await demoDelay();
+    demoWishes = demoWishes.filter((i) => i.id !== id);
+    return;
+  }
+  await mod.default.wish_list.delete(id);
+}
+
+// ---------------------------------------------------------------------------
 // Events
 // ---------------------------------------------------------------------------
 
@@ -269,6 +545,7 @@ const EV_CHAT_MESSAGE = "Wfm:OnChatMessage";
 const EV_REFRESH_TRANSACTIONS = "Transaction:RefreshTransactions";
 const EV_REFRESH_STOCK_ITEMS = "LiveScraper:RefreshStockItems";
 const EV_REFRESH_STOCK_RIVENS = "LiveScraper:RefreshStockRivens";
+const EV_REFRESH_WISH_LIST = "LiveScraper:RefreshWishListItems";
 /** Raw Tauri event the log parser emits when it sees a finished in-game trade. */
 const EV_ADD_TRADE = "add_trade";
 
@@ -294,6 +571,8 @@ export interface StationEvents {
   onSale(gain: number, playerName: string): void;
   /** Something changed that may have moved the balance: re-poll now. */
   onRefresh(): void;
+  /** Stock items, stock rivens or the wish list changed. */
+  onStock?(): void;
 }
 
 async function buyerFromChat(mod: ApiModule, msg: ChatMessagePayload): Promise<Omit<Buyer, "pings"> | null> {
@@ -352,6 +631,11 @@ export function subscribeStationEvents(handlers: StationEvents): () => void {
       for (const ev of [EV_REFRESH_TRANSACTIONS, EV_REFRESH_STOCK_ITEMS, EV_REFRESH_STOCK_RIVENS]) {
         mod.OnTauriEvent(ev, onRefresh);
         cleanups.push(() => mod.OffTauriEvent(ev, onRefresh));
+      }
+      const onStock = () => handlers.onStock?.();
+      for (const ev of [EV_REFRESH_STOCK_ITEMS, EV_REFRESH_STOCK_RIVENS, EV_REFRESH_WISH_LIST]) {
+        mod.OnTauriEvent(ev, onStock);
+        cleanups.push(() => mod.OffTauriEvent(ev, onStock));
       }
     } catch (e) {
       console.warn("[station] event subscription failed", e);
