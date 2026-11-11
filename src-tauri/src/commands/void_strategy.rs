@@ -166,6 +166,7 @@ pub async fn vt_strategy_set(
     smart_enabled: Option<bool>,
     strict_tiers: Option<bool>,
     locked_fields: Option<Vec<String>>,
+    manual_platinum: Option<i64>,
     app: tauri::State<'_, Mutex<AppState>>,
 ) -> Result<StrategyStatus, Error> {
     // Net worth first (async), so the settings lock is never held across an await.
@@ -182,6 +183,10 @@ pub async fn vt_strategy_set(
         }
         if let Some(strict_tiers) = strict_tiers {
             vt.strict_tiers = strict_tiers;
+        }
+        if let Some(manual_platinum) = manual_platinum {
+            // A negative value clears it.
+            vt.manual_platinum = if manual_platinum < 0 { None } else { Some(manual_platinum) };
         }
         if let Some(locked_fields) = locked_fields {
             if let Some(unknown) = locked_fields

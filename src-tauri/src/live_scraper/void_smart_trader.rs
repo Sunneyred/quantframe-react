@@ -15,11 +15,10 @@ use std::{
 };
 
 use entity::{
-    enums::TransactionType, stock_item::StockItemPaginationQueryDto,
-    stock_riven::StockRivenPaginationQueryDto, transaction::TransactionPaginationQueryDto,
+    stock_item::StockItemPaginationQueryDto, stock_riven::StockRivenPaginationQueryDto,
 };
 use serde::Serialize;
-use service::{StockItemQuery, StockRivenQuery, TransactionQuery};
+use service::{StockItemQuery, StockRivenQuery};
 use tauri::Manager;
 use utils::Error;
 
@@ -787,17 +786,16 @@ pub async fn gather_signals() -> Result<Signals, Error> {
         + rivens.results.iter().map(|r| r.bought.max(0)).sum::<i64>();
 
     let inventory_live = root.mastery_rank > 0 || root.platinum > 0;
-    let tracked_balance = if inventory_live {
-        0
-    } else {
-        let transactions =
-            TransactionQuery::get_all(conn, TransactionPaginationQueryDto::new(1, -1)).await?;
-        transactions
-            .results
-            .iter()
-            .map(|t| if t.transaction_type == TransactionType::Sale { t.price } else { -t.price })
-            .sum()
-    };
+    // Without live inventory data the balance is whatever the user typed in. Sales minus
+    // purchases is NOT a balance (it ignores plat spent or earned outside the app), so it is
+    // never used: an unset value means "unknown" and the balance rules are skipped.
+    let _ = inventory_live;
+    let tracked_balance = states::get_settings()?
+        .live_scraper
+        .void_trader
+        .manual_platinum
+        .unwrap_or(0)
+        .max(0);
     let (balance, balance_is_live) =
         resolve_balance(root.platinum, root.mastery_rank, tracked_balance);
 

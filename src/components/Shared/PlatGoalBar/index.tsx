@@ -39,9 +39,9 @@ export function PlatGoalBar() {
             <Text className={classes.plat}>{fmt(goal.platinum)}p</Text>
             <Text c="dimmed">/ {fmt(goal.goal)}p goal</Text>
             {!goal.balance_is_live && (
-              <Tooltip label="No inventory data yet, so this is your tracked buy and sell total, not your real balance. Connect AlecaFrame in Cargo.">
+              <Tooltip label="No live inventory data. This is the plat you typed in under Live Trading, Strategy. Connect AlecaFrame in Cargo to track it automatically.">
                 <Text size="xs" c="orange.5">
-                  (estimated)
+                  {goal.balance_known ? "(typed in)" : "(not set: enter your plat under Live Trading, Strategy)"}
                 </Text>
               </Tooltip>
             )}

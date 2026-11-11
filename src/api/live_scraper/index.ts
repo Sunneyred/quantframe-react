@@ -28,6 +28,8 @@ export interface StrategySetInput {
   smart_enabled?: boolean;
   strict_tiers?: boolean;
   locked_fields?: string[];
+  /** Plat balance typed in by the user; a negative value clears it. */
+  manual_platinum?: number;
 }
 export interface StrategyAdjustment {
   /** RFC 3339 time the adjustment was first seen. */

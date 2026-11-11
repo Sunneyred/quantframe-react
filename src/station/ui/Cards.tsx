@@ -109,7 +109,7 @@ export function TankCard({ goal, demo, onClose }: { goal: GoalSnapshot | null; d
           </Badge>
         ) : !goal.balance_is_live ? (
           <Badge color="orange" variant="light">
-            Estimated
+            Typed in
           </Badge>
         ) : (
           <Badge color="teal" variant="light">
@@ -149,7 +149,7 @@ export function TankCard({ goal, demo, onClose }: { goal: GoalSnapshot | null; d
         )}
         {!demo && !goal.balance_is_live && (
           <Text size="xs" c="dimmed">
-            No inventory data yet: this is your tracked buy and sell total, not your real balance.
+            No live inventory data: this is the plat you typed in at the Manager (strategy). Connect AlecaFrame at the Cargo scanner to track it automatically.
           </Text>
         )}
         <Group justify="flex-end" mt="xs">

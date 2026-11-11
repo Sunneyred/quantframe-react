@@ -11,8 +11,7 @@ use std::{
 
 use chrono::Utc;
 use entity::{
-    enums::TransactionType, stock_item::StockItemPaginationQueryDto,
-    transaction::TransactionPaginationQueryDto,
+    stock_item::StockItemPaginationQueryDto, transaction::TransactionPaginationQueryDto,
 };
 use serde::{Deserialize, Serialize};
 use service::{StockItemQuery, TransactionQuery};
@@ -235,6 +234,8 @@ pub struct PlatGoal {
     pub profit_today: i64,
     /// False when the balance comes from tracked profit only (no inventory data).
     pub balance_is_live: bool,
+    /// False when there is no inventory data and no typed-in balance.
+    pub balance_known: bool,
 }
 
 /// Pick the goal: the first ladder rung that is at least ~3 days of profit away.
@@ -274,10 +275,7 @@ pub async fn vt_plat_goal(
     let today = now.date_naive();
     let mut week_profit = 0i64;
     let mut profit_today = 0i64;
-    let mut tracked_balance = 0i64;
     for t in transactions.results.iter() {
-        let signed = if t.transaction_type == TransactionType::Sale { t.price } else { -t.price };
-        tracked_balance += signed;
         let profit = t.profit.unwrap_or(0);
         if t.created_at >= week_ago {
             week_profit += profit;
@@ -288,7 +286,8 @@ pub async fn vt_plat_goal(
     }
     let avg_daily_profit = week_profit as f64 / 7.0;
     let balance_is_live = root.mastery_rank > 0 || root.platinum > 0;
-    let platinum = if balance_is_live { root.platinum } else { tracked_balance.max(0) };
+    let manual = states::get_settings()?.live_scraper.void_trader.manual_platinum;
+    let platinum = if balance_is_live { root.platinum } else { manual.unwrap_or(0).max(0) };
     let (floor, goal) = pick_goal(platinum, avg_daily_profit);
     let progress = if goal > floor {
         ((platinum - floor) as f64 / (goal - floor) as f64).clamp(0.0, 1.0)
@@ -304,6 +303,7 @@ pub async fn vt_plat_goal(
         avg_daily_profit: (avg_daily_profit * 10.0).round() / 10.0,
         profit_today,
         balance_is_live,
+        balance_known: balance_is_live || manual.is_some(),
     })
 }
 

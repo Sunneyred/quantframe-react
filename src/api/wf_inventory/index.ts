@@ -64,4 +64,5 @@ export interface PlatGoal {
   avg_daily_profit: number;
   profit_today: number;
   balance_is_live: boolean;
+  balance_known: boolean;
 }

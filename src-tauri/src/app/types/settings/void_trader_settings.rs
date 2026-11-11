@@ -60,6 +60,9 @@ pub struct VoidTraderSettings {
     /// Setting paths (e.g. `items.wts.min_profit`) that presets and the smart trader never touch.
     #[serde(default)]
     pub locked_fields: Vec<String>,
+    /// Plat balance typed in by the user, used while no live inventory data is available.
+    #[serde(default)]
+    pub manual_platinum: Option<i64>,
 }
 
 impl VoidTraderSettings {
@@ -75,6 +78,7 @@ impl Default for VoidTraderSettings {
             smart_enabled: true,
             strict_tiers: true,
             locked_fields: Vec::new(),
+            manual_platinum: None,
         }
     }
 }

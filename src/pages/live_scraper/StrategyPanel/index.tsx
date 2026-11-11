@@ -5,6 +5,7 @@ import {
   Button,
   Collapse,
   Group,
+  NumberInput,
   Paper,
   ScrollArea,
   SimpleGrid,
@@ -165,9 +166,10 @@ export const StrategyPanel = () => {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const alive = useRef(true);
+  const [platDraft, setPlatDraft] = useState<number | "">("");
   const [open, setOpen] = useLocalStorage<boolean>({
-    key: "live_scraper.strategy_open",
-    defaultValue: true,
+    key: "live_scraper.strategy_open_v2",
+    defaultValue: false,
   });
 
   const load = useCallback(async () => {
@@ -239,12 +241,31 @@ export const StrategyPanel = () => {
           </Group>
           <Text size="sm" c="dimmed">
             {fmt(status.platinum)}p plat
-            {status.balance_is_live ? "" : " (estimated from tracked trades)"} +{" "}
+            {status.balance_is_live ? "" : status.platinum > 0 ? " (typed in)" : " (not set)"} +{" "}
             {fmt(status.stock_value)}p paid for unsold stock
             {status.trades_remaining != null
               ? ` · ${status.trades_remaining} trades left today`
               : ""}
           </Text>
+          {!status.balance_is_live && (
+            <Group gap={6} align="flex-end">
+              <NumberInput
+                size="xs"
+                w={150}
+                min={0}
+                label="Your plat right now"
+                placeholder="e.g. 76"
+                value={platDraft}
+                onChange={(v) => setPlatDraft(v === "" ? "" : Number(v))}
+              />
+              <Button size="xs" disabled={busy || platDraft === ""} onClick={() => update({ manual_platinum: Number(platDraft) })}>
+                Set
+              </Button>
+              <Text size="xs" c="dimmed" maw={320}>
+                No live inventory data, so tiers and buy limits use this number. Update it as you earn, or connect AlecaFrame in Cargo.
+              </Text>
+            </Group>
+          )}
         </Stack>
         <Stack gap={6} align="flex-end">
           <Tooltip
