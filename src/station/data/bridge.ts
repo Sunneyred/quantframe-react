@@ -1,3 +1,4 @@
+import type { SellCandidate, SellFinderResult } from "@api/wf_inventory";
 import { progressOf, type Buyer, type GoalSnapshot } from "../engine/logic";
 
 /**
@@ -103,6 +104,160 @@ export async function fetchGoal(): Promise<GoalResult> {
     console.warn("[station] vt_plat_goal failed, using demo data", e);
   }
   return { goal: demoGoal(), demo: true };
+}
+
+// ---------------------------------------------------------------------------
+// Warehouse (sell finder)
+// ---------------------------------------------------------------------------
+
+/** Same floor the Sell Finder tab starts with: rows under this price each are noise. */
+const SELL_MIN_PRICE = 5;
+
+type DemoRow = [name: string, category: string, quantity: number, unit: number, volume: number, basis?: SellCandidate["basis"], inStock?: boolean];
+const DEMO_ROWS: DemoRow[] = [
+  ["Glaive Prime Blade", "prime", 2, 38, 61],
+  ["Nova Prime Neuroptics Blueprint", "prime", 3, 14, 44],
+  ["Rhino Prime Chassis Blueprint", "prime", 1, 22, 37],
+  ["Akstiletto Prime Barrel", "prime", 6, 9, 52],
+  ["Paris Prime Lower Limb", "prime", 12, 4, 20],
+  ["Soma Prime Stock", "prime", 2, 6, 31],
+  ["Mesa Prime Systems Blueprint", "prime", 1, 55, 28, "exact", true],
+  ["Glaive Prime Set", "set", 1, 165, 48],
+  ["Nova Prime Set", "set", 2, 78, 35],
+  ["Kronen Prime Set", "set", 1, 92, 40],
+  ["Burston Prime Set", "set", 1, 24, 12],
+  ["Primed Continuity", "mod", 1, 62, 55, "max_rank"],
+  ["Blind Rage", "mod", 4, 12, 70],
+  ["Narrow Minded", "mod", 2, 18, 66],
+  ["Condition Overload", "mod", 1, 26, 80, "max_rank"],
+  ["Maiming Strike", "mod", 1, 48, 33],
+  ["Vigilante Armaments", "mod", 27, 5, 90],
+  ["Arcane Energize", "arcane", 3, 34, 140, "arcane_estimate"],
+  ["Arcane Grace", "arcane", 6, 11, 95, "arcane_estimate"],
+  ["Arcane Guardian", "arcane", 11, 6, 110, "arcane_estimate"],
+  ["Molt Augmented", "arcane", 2, 9, 60, "arcane_estimate"],
+  ["Axi L4 Relic", "relic", 14, 6, 120],
+  ["Neo N11 Relic", "relic", 5, 5, 74],
+  ["Lith G1 Relic", "relic", 30, 5, 88],
+  ["Ayatan Anasa Sculpture", "other", 4, 9, 45],
+  ["Legendary Fusion Core", "other", 1, 210, 3],
+  ["Scimitar Avionics", "other", 2, 16, 8],
+];
+
+const demoStocked = new Set(DEMO_ROWS.filter((r) => r[6]).map((r) => r[0]));
+let demoListFails = false;
+
+/** Dev helper: make the next demo listing fail, to see the error state. */
+export function demoFailNextListing() {
+  demoListFails = true;
+}
+
+/** Dev switches for the standalone page: `?offline` shows the not-connected state, `?many` overfills the mods bay. */
+const demoFlag = (name: string): boolean => {
+  try {
+    return new URLSearchParams(window.location.search).has(name);
+  } catch {
+    return false;
+  }
+};
+
+function demoSellFinder(): SellFinderResult {
+  if (demoFlag("offline")) return EMPTY_SELL;
+  const rows = demoFlag("many") ? [...DEMO_ROWS, ...Array.from({ length: 9 }, (_, i): DemoRow => [`Demo Mod ${i + 1}`, "mod", 1 + (i % 4), 5 + i * 3, 10 + i])] : DEMO_ROWS;
+  const items: SellCandidate[] = rows.map(([name, category, quantity, unit_price, volume, basis = "exact"]) => {
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+    return {
+      name,
+      wfm_url: slug,
+      unique_name: `/Demo/${slug}`,
+      icon: "",
+      category,
+      quantity,
+      unit_price,
+      total: quantity * unit_price,
+      volume,
+      week_price_shift: 0,
+      basis,
+      in_stock: demoStocked.has(name),
+    };
+  }).sort((a, b) => b.total - a.total);
+  return {
+    connected: true,
+    platinum: demo.platinum,
+    trades_remaining: 14,
+    mastery_rank: 16,
+    owned_tradable: items.length + 9,
+    unpriced: 9,
+    total_value: items.filter((i) => i.basis !== "max_rank").reduce((sum, i) => sum + i.total, 0),
+    items,
+  };
+}
+
+const EMPTY_SELL: SellFinderResult = { connected: false, platinum: 0, trades_remaining: 0, mastery_rank: 0, owned_tradable: 0, unpriced: 0, total_value: 0, items: [] };
+
+export const errorText = (e: unknown): string => {
+  if (typeof e === "string") return e;
+  const o = e as { message?: unknown; cause?: unknown } | null;
+  if (o && typeof o.message === "string" && o.message) return o.message;
+  if (o && typeof o.cause === "string" && o.cause) return o.cause;
+  try {
+    return JSON.stringify(e) ?? "Unknown error";
+  } catch {
+    return "Unknown error";
+  }
+};
+
+export interface SellResult {
+  result: SellFinderResult;
+  /** True when the rows are demo data (no Tauri backend). */
+  demo: boolean;
+  /** Set when the real backend refused: the result is then empty and not connected. */
+  error?: string;
+}
+
+function isSellResult(v: unknown): v is SellFinderResult {
+  if (!v || typeof v !== "object") return false;
+  const r = v as Record<string, unknown>;
+  return typeof r.connected === "boolean" && Array.isArray(r.items);
+}
+
+/**
+ * Read the sell finder. `rescan` first asks the backend to re-read the inventory
+ * file. Outside Tauri this is demo stock; inside Tauri a failure is reported,
+ * never papered over with fake items.
+ */
+export async function fetchSellFinder(rescan = false): Promise<SellResult> {
+  const mod = await loadApi();
+  if (!mod) {
+    await new Promise((r) => setTimeout(r, rescan ? 350 : 60));
+    return { result: demoSellFinder(), demo: true };
+  }
+  try {
+    if (rescan) await mod.default.wf_inventory.refresh();
+    const res: unknown = await mod.default.wf_inventory.sellFinder(SELL_MIN_PRICE);
+    if (isSellResult(res)) return { result: res, demo: false };
+    return { result: EMPTY_SELL, demo: false, error: "The sell finder returned something unexpected." };
+  } catch (e) {
+    console.warn("[station] vt_sell_finder failed", e);
+    return { result: EMPTY_SELL, demo: false, error: errorText(e) };
+  }
+}
+
+/** Add an owned item to stock at 0p cost, exactly like "Add to stock" in Cargo > Sell Finder. Throws on failure. */
+export async function listForSale(item: SellCandidate, quantity: number): Promise<void> {
+  const qty = Math.max(1, Math.min(item.quantity, Math.floor(quantity) || 1));
+  const mod = await loadApi();
+  if (!mod) {
+    if (isTauri()) throw new Error("The app backend is not available.");
+    await new Promise((r) => setTimeout(r, 450));
+    if (demoListFails) {
+      demoListFails = false;
+      throw new Error("Demo failure: the listing was rejected.");
+    }
+    demoStocked.add(item.name);
+    return;
+  }
+  await mod.default.stock_item.create({ raw: item.wfm_url, quantity: qty, bought: 0, sub_type: item.sub_type });
 }
 
 // ---------------------------------------------------------------------------

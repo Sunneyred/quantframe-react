@@ -16,15 +16,27 @@ export const rectsOverlap = (a: Rect, b: Rect) => a.x < b.x + b.w && a.x + a.w >
 
 export const bodyRect = (x: number, y: number): Rect => ({ x: x - BODY_HALF_W, y: y - BODY_H, w: BODY_HALF_W * 2, h: BODY_H });
 
-export function isBlocked(x: number, y: number, floor: Rect, solids: Rect[]): boolean {
+const inAny = (px: number, py: number, floors: Rect[]) => {
+  for (const f of floors) if (px >= f.x && px <= f.x + f.w && py >= f.y && py <= f.y + f.h) return true;
+  return false;
+};
+
+/**
+ * `floor` is one walkable rect or several overlapping ones (rooms joined by a
+ * corridor). The body is small next to every floor rect, so testing its four
+ * corners against the union is exact for these layouts.
+ */
+export function isBlocked(x: number, y: number, floor: Rect | Rect[], solids: Rect[]): boolean {
   const r = bodyRect(x, y);
-  if (r.x < floor.x || r.y < floor.y || r.x + r.w > floor.x + floor.w || r.y + r.h > floor.y + floor.h) return true;
+  if (Array.isArray(floor)) {
+    if (!inAny(r.x, r.y, floor) || !inAny(r.x + r.w, r.y, floor) || !inAny(r.x, r.y + r.h, floor) || !inAny(r.x + r.w, r.y + r.h, floor)) return true;
+  } else if (r.x < floor.x || r.y < floor.y || r.x + r.w > floor.x + floor.w || r.y + r.h > floor.y + floor.h) return true;
   for (const s of solids) if (rectsOverlap(r, s)) return true;
   return false;
 }
 
 /** Move with per-axis sliding. Returns the new position and whether any axis was blocked. */
-export function moveBody(body: Body, dx: number, dy: number, floor: Rect, solids: Rect[]): { x: number; y: number; hitX: boolean; hitY: boolean } {
+export function moveBody(body: Body, dx: number, dy: number, floor: Rect | Rect[], solids: Rect[]): { x: number; y: number; hitX: boolean; hitY: boolean } {
   let { x, y } = body;
   let hitX = false;
   let hitY = false;
@@ -47,3 +59,8 @@ export function distToRect(px: number, py: number, r: Rect): number {
 
 export const pointInRect = (px: number, py: number, r: Rect, pad = 0) =>
   px >= r.x - pad && px <= r.x + r.w + pad && py >= r.y - pad && py <= r.y + r.h + pad;
+
+/** Closest point of a rect to a point. */
+export function nearestOnRect(px: number, py: number, r: Rect): { x: number; y: number } {
+  return { x: Math.min(r.x + r.w, Math.max(r.x, px)), y: Math.min(r.y + r.h, Math.max(r.y, py)) };
+}

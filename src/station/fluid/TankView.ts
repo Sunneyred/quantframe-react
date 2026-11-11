@@ -99,6 +99,15 @@ export class TankView {
     return g;
   }
 
+  /** The live fluid pixels (RGBA, TANK_GLASS sized). The first-person view uses them as a wall texture. */
+  get image(): ImageData | null {
+    return this.renderer?.image ?? null;
+  }
+
+  get pouring(): boolean {
+    return isPouring(this.fluid);
+  }
+
   setFill(fill: number) {
     setFill(this.fluid, fill);
   }

@@ -14,6 +14,8 @@ const MOVE_KEYS: Record<string, [number, number]> = {
 function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName;
+  // a focused checkbox or button is not a text field: the station keys keep working
+  if (target instanceof HTMLInputElement && ["checkbox", "radio", "button", "range"].includes(target.type)) return false;
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
 }
 
@@ -34,6 +36,7 @@ export class Keyboard {
       e.preventDefault(); // arrows would scroll the page
       return;
     }
+    if (e.code === "Tab") e.preventDefault(); // Tab is the quick panel, not focus traversal
     if (!e.repeat) this.onPress(e.code);
   };
 
@@ -45,6 +48,11 @@ export class Keyboard {
     this.down.clear();
   };
 
+  isDown(code: string): boolean {
+    return this.enabled && this.down.has(code);
+  }
+
+  /** Top-down movement: WASD and arrows both move along the screen axes. */
   axis(): { ax: number; ay: number } {
     let ax = 0;
     let ay = 0;

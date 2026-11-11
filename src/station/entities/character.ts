@@ -45,9 +45,11 @@ export class Character {
   private drawnKey = "";
   dir: Dir = "down";
   walking = false;
+  /** Current walk-cycle frame (0 or 1), shared with the first-person billboards. */
+  frame = 0;
   private walkTime = 0;
 
-  constructor(private palette: CharacterPalette) {
+  constructor(readonly palette: CharacterPalette) {
     this.shadow.ellipse(0, 0, 5, 2).fill({ color: PAL.shadow, alpha: 0.4 });
     this.view.addChild(this.shadow, this.g);
     this.redraw(0);
@@ -60,59 +62,82 @@ export class Character {
 
   update(dt: number) {
     this.walkTime = this.walking ? this.walkTime + dt : 0;
-    const frame = this.walking ? Math.floor(this.walkTime * 7) % 2 : 0;
-    this.redraw(frame);
+    this.frame = this.walking ? Math.floor(this.walkTime * 7) % 2 : 0;
+    this.redraw(this.frame);
   }
 
   private redraw(frame: number) {
     const key = `${this.dir}:${frame}:${this.walking ? 1 : 0}`;
     if (key === this.drawnKey) return;
     this.drawnKey = key;
-    const p = this.palette;
     const g = this.g;
     g.clear();
-    const bob = this.walking && frame === 1 ? -1 : 0;
-    // legs: alternate which foot is lifted
-    const liftL = this.walking && frame === 0 ? 1 : 0;
-    const liftR = this.walking && frame === 1 ? 1 : 0;
-    g.rect(-4, -4, 3, 4 - liftL).fill(p.suitDark);
-    g.rect(1, -4, 3, 4 - liftR).fill(p.suitDark);
-    // torso
-    g.rect(-4, -10 + bob, 8, 6).fill(p.suit);
-    g.rect(-4, -5 + bob, 8, 1).fill(p.trim);
-    // arms
-    if (this.dir === "left" || this.dir === "right") {
-      const ax = this.dir === "left" ? -1 : 0;
-      g.rect(ax, -9 + bob + (frame === 1 ? 1 : 0), 2, 4).fill(p.suitDark);
-    } else {
-      g.rect(-5, -9 + bob + liftL, 1, 4).fill(p.suitDark);
-      g.rect(4, -9 + bob + liftR, 1, 4).fill(p.suitDark);
-    }
-    // head
-    g.rect(-4, -16 + bob, 8, 6).fill(p.head);
-    g.rect(-3, -17 + bob, 6, 1).fill(p.head);
-    g.rect(-1, -18 + bob, 2, 1).fill(p.trim);
-    switch (this.dir) {
-      case "down":
-        g.rect(-3, -14 + bob, 6, 2).fill(p.visor);
-        g.rect(-1, -10 + bob, 2, 2).fill(p.trim);
-        break;
-      case "up":
-        g.rect(-3, -12 + bob, 6, 1).fill(p.suitDark);
-        g.rect(-1, -10 + bob, 2, 5).fill(p.suitDark);
-        break;
-      case "left":
-        g.rect(-4, -14 + bob, 4, 2).fill(p.visor);
-        break;
-      case "right":
-        g.rect(0, -14 + bob, 4, 2).fill(p.visor);
-        break;
-    }
+    paintCharacter((x, y, w, h, color) => g.rect(x, y, w, h).fill(color), this.palette, this.dir, frame, this.walking);
   }
 
   destroy() {
     this.view.destroy({ children: true });
   }
+}
+
+/** Extent of the character art around its origin (feet, bottom centre). */
+export const CHAR_ART = { x: -5, y: -18, w: 10, h: 18 } as const;
+
+/**
+ * The character art as a list of rects, so the Pixi sprite and the
+ * first-person billboards are drawn by the same code.
+ */
+export function paintCharacter(
+  rect: (x: number, y: number, w: number, h: number, color: number) => void,
+  p: CharacterPalette,
+  dir: Dir,
+  frame: number,
+  walking: boolean,
+) {
+  const bob = walking && frame === 1 ? -1 : 0;
+  // legs: alternate which foot is lifted
+  const liftL = walking && frame === 0 ? 1 : 0;
+  const liftR = walking && frame === 1 ? 1 : 0;
+  rect(-4, -4, 3, 4 - liftL, p.suitDark);
+  rect(1, -4, 3, 4 - liftR, p.suitDark);
+  // torso
+  rect(-4, -10 + bob, 8, 6, p.suit);
+  rect(-4, -5 + bob, 8, 1, p.trim);
+  // arms
+  if (dir === "left" || dir === "right") {
+    const ax = dir === "left" ? -1 : 0;
+    rect(ax, -9 + bob + (frame === 1 ? 1 : 0), 2, 4, p.suitDark);
+  } else {
+    rect(-5, -9 + bob + liftL, 1, 4, p.suitDark);
+    rect(4, -9 + bob + liftR, 1, 4, p.suitDark);
+  }
+  // head
+  rect(-4, -16 + bob, 8, 6, p.head);
+  rect(-3, -17 + bob, 6, 1, p.head);
+  rect(-1, -18 + bob, 2, 1, p.trim);
+  switch (dir) {
+    case "down":
+      rect(-3, -14 + bob, 6, 2, p.visor);
+      rect(-1, -10 + bob, 2, 2, p.trim);
+      break;
+    case "up":
+      rect(-3, -12 + bob, 6, 1, p.suitDark);
+      rect(-1, -10 + bob, 2, 5, p.suitDark);
+      break;
+    case "left":
+      rect(-4, -14 + bob, 4, 2, p.visor);
+      break;
+    case "right":
+      rect(0, -14 + bob, 4, 2, p.visor);
+      break;
+  }
+}
+
+const DIR_ANGLE: Record<Dir, number> = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 };
+export const angleOfDir = (dir: Dir) => DIR_ANGLE[dir];
+export function dirFromAngle(angle: number): Dir {
+  const q = ((Math.round(angle / (Math.PI / 2)) % 4) + 4) % 4;
+  return (["right", "down", "left", "up"] as const)[q];
 }
 
 export function dirFromVector(dx: number, dy: number, fallback: Dir): Dir {
