@@ -104,8 +104,54 @@ impl ItemModule {
         Ok(())
     }
 
+    /// Void Trader: delete every open buy order except wish list ones.
+    async fn delete_suspended_buy_orders(
+        &self,
+        app: &AppState,
+        my_orders: &OrderList<Order>,
+    ) -> Result<(), Error> {
+        if my_orders.buy_orders.is_empty() {
+            return Ok(());
+        }
+        let client = self.client.upgrade().expect("Failed to upgrade client");
+        let conn = DATABASE.get().unwrap();
+        let wish_list = service::WishListQuery::get_all(
+            conn,
+            entity::wish_list::WishListPaginationQueryDto::new(1, -1),
+        )
+        .await
+        .map_err(|e| e.with_location(get_location!()))?;
+        let wish_ids: HashSet<&str> = wish_list.results.iter().map(|w| w.wfm_id.as_str()).collect();
+        for order in my_orders.buy_orders.iter() {
+            if wish_ids.contains(order.item_id.as_str()) {
+                continue;
+            }
+            if Self::should_stop(&client, app) {
+                break;
+            }
+            match app.wfm_client.order().delete(&order.id).await {
+                Ok(_) => info(
+                    comp("Liquidate"),
+                    &format!("Buying is suspended by the strategy: deleted buy order {}", order.id),
+                    &&LoggerOptions::default(),
+                ),
+                Err(e) => error(
+                    comp("Liquidate"),
+                    &format!("Failed to delete buy order {}: {}", order.id, e),
+                    &&LoggerOptions::default().set_file(LOG_FILE),
+                ),
+            }
+        }
+        Ok(())
+    }
+
     pub async fn check(&self) -> Result<(), Error> {
-        let app = states::app_state()?;
+        // Void Trader: this cycle trades on the EFFECTIVE settings (saved settings overlaid by
+        // the preset and adjusted by the smart trader). `app` is a local copy, so the saved
+        // settings are never modified.
+        let mut app = states::app_state()?;
+        let saved_live_scraper = app.settings.live_scraper.clone();
+        app.settings.live_scraper = void_smart_trader::effective_settings()?;
         info(
             comp("Check"),
             "Checking Item items...",
@@ -118,6 +164,11 @@ impl ItemModule {
         // Delete unwanted orders
         self.delete_unwanted_orders(&app, &app.settings, &my_orders)
             .await?;
+
+        // Void Trader: the strategy turned buying off (liquidate) -> take open buy orders down.
+        if void_smart_trader::buying_suspended(&saved_live_scraper, &app.settings.live_scraper) {
+            self.delete_suspended_buy_orders(&app, &my_orders).await?;
+        }
 
         // Collect interesting items
         let interesting_items = collect_interesting_items(&app, COMPONENT, &app.settings).await?;
@@ -369,7 +420,10 @@ impl ItemModule {
         let conn = DATABASE.get().unwrap();
         let log_options = &LoggerOptions::default().set_enable(true);
         let component = comp("Buying");
-        let settings = states::get_settings()?.live_scraper.items;
+        // Void Trader: effective settings (preset + smart trader), not the raw saved ones.
+        let effective = void_smart_trader::effective_settings()?;
+        let void_trader = effective.void_trader;
+        let settings = effective.items;
 
         // Helper function to log messages with the component prefix
         let log = |msg: &str| info(&component, msg, &log_options);
@@ -417,6 +471,49 @@ impl ItemModule {
                 "Item {} has no market volume. Skipping WTB order creation.",
                 item_info.name
             ));
+            return Ok(());
+        }
+
+        // Void Trader smart trader: do not buy into a falling price or a crowded market.
+        let trend = void_smart_trader::item_trend(&void_trader, price.week_price_shift, price.avg_price);
+        let skip_reason = void_smart_trader::skip_buy_reason(
+            &void_trader,
+            trend,
+            entry.sell_market_info.volume,
+            price.volume,
+        );
+        void_smart_trader::note_item_decision(
+            "buy",
+            &item_info.wfm_url,
+            skip_reason.map(|reason| {
+                let why = if reason == "FallingPrice" {
+                    format!("price fell {:.0}p this week", -price.week_price_shift)
+                } else {
+                    format!(
+                        "{} sellers online for about {:.0} trades a day",
+                        entry.sell_market_info.volume, price.volume
+                    )
+                };
+                (reason.to_string(), format!("Skipped buying {}: {}", item_info.name, why))
+            }),
+        );
+        if let Some(reason) = skip_reason {
+            log(&format!(
+                "Item {} skipped by the smart trader ({}). Removing any WTB order.",
+                item_info.name, reason
+            ));
+            if trade_operations.has("Update") && !order_id.is_empty() {
+                match wfm_client.order().delete(&order_id).await {
+                    Ok(_) => {
+                        send_event!(UIEvent::RefreshWfmOrders, json!({"source": component}));
+                    }
+                    Err(e) => error(
+                        &component,
+                        &format!("Failed to delete order {}: {}", order_id, e),
+                        &&LoggerOptions::default().set_file(LOG_FILE),
+                    ),
+                }
+            }
             return Ok(());
         }
 
@@ -651,7 +748,10 @@ impl ItemModule {
         let conn = DATABASE.get().unwrap();
         let log_options = &LoggerOptions::default();
         let component = comp("Selling");
-        let settings = states::get_settings()?.live_scraper.items;
+        // Void Trader: effective settings (preset + smart trader), not the raw saved ones.
+        let effective = void_smart_trader::effective_settings()?;
+        let void_trader = effective.void_trader;
+        let settings = effective.items;
 
         let log = |msg: &str| info(&component, msg, &log_options);
 
@@ -750,8 +850,30 @@ impl ItemModule {
 
         // Start with the lowest competitor price as the initial post price.
         // Void Trader: undercut the cheapest seller so our listing is shown first.
-        let mut post_price = if lowest_price > 0 && !is_disabled(settings.wts.undercut_step) {
-            (lowest_price - settings.wts.undercut_step).max(1)
+        // Smart trader: a falling price undercuts one plat more, a rising price only matches.
+        let trend = void_smart_trader::item_trend(&void_trader, price.week_price_shift, price.avg_price);
+        let undercut_step =
+            void_smart_trader::undercut_for_trend(&void_trader, settings.wts.undercut_step, trend);
+        void_smart_trader::note_item_decision(
+            "undercut",
+            &item_info.wfm_url,
+            (undercut_step != settings.wts.undercut_step).then(|| {
+                let reason = if undercut_step > settings.wts.undercut_step {
+                    format!(
+                        "Undercutting {} by {}p instead of {}p: price fell {:.0}p this week",
+                        item_info.name, undercut_step, settings.wts.undercut_step, -price.week_price_shift
+                    )
+                } else {
+                    format!(
+                        "Not undercutting {}: price rose {:.0}p this week",
+                        item_info.name, price.week_price_shift
+                    )
+                };
+                (undercut_step.to_string(), reason)
+            }),
+        );
+        let mut post_price = if lowest_price > 0 && !is_disabled(undercut_step) {
+            (lowest_price - undercut_step).max(1)
         } else {
             lowest_price
         };
@@ -959,7 +1081,7 @@ impl ItemModule {
         let conn = DATABASE.get().unwrap();
         let component = comp("WishList:");
         let log_options = LoggerOptions::default();
-        let settings = states::get_settings()?.live_scraper.items;
+        let settings = void_smart_trader::effective_settings()?.items;
         let wfm_client = states::app_state()?.wfm_client;
 
         let log = |msg: &str| info(&component, msg, &log_options);
@@ -1144,7 +1266,7 @@ impl ItemModule {
         let conn = DATABASE.get().unwrap();
         let log_options = &LoggerOptions::default();
         let component = comp("Syndicate");
-        let settings = states::get_settings()?.live_scraper.items;
+        let settings = void_smart_trader::effective_settings()?.items;
         let syndicate_settings = states::get_settings()?.live_scraper.syndicate;
 
         let log = |msg: &str| info(&component, msg, &log_options);

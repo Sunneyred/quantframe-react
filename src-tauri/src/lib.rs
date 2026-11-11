@@ -359,6 +359,8 @@ pub fn run() {
             commands::void_riven_market::vt_riven_prices_lookup,
             commands::void_riven_market::vt_riven_price_history,
             commands::void_riven_market::vt_riven_prices_export,
+            commands::void_strategy::vt_strategy_status,
+            commands::void_strategy::vt_strategy_set,
             commands::riven::export_riven_price_data,
             // Riven price prediction commands
             commands::riven_pricer::riven_pricer_available,

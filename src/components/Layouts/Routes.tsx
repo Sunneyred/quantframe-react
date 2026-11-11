@@ -51,6 +51,9 @@ const CleanPage = lazy(routeLoaders.clean);
 // Inventory Pages
 const WfInventoryPage = lazy(routeLoaders.wfInventory);
 
+// Void Trader: the walk-around station
+const PStation = lazy(() => import("../../station/StationPage"));
+
 export function AppRoutes() {
   const { app_error } = useAppContext();
   const { user } = useAuthContext();
@@ -92,6 +95,7 @@ export function AppRoutes() {
             <Route path="/" element={<LogInLayout />}>
               <Route element={<AuthenticatedGate goTo="/auth/login" />}>
                 <Route path="/" element={<PHome />} />
+                <Route path="station" element={<PStation />} />
                 <Route path="debug">
                   <Route index element={<PDebug />} />
                 </Route>

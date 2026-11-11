@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use qf_api::enums::app_events::ApplicationEvent as EventType;
 use serde_json::json;
+use tauri::Emitter;
 use utils::{info, DetectionStatus, Error, LineEntry, LineHandler, LoggerOptions};
 
 use crate::{track_event, utils::modules::states};
@@ -64,6 +65,10 @@ fn notify(player_name: &str) {
         EventType::ChatConversationDetected,
         [("success", "true".to_string())]
     );
+    // Void Trader: tell the station a player opened a whisper, so a customer walks in.
+    if let Some(app) = crate::APP.get() {
+        let _ = app.emit("vt_whisper", json!({ "playerName": player_name }));
+    }
     let mut variables = HashMap::new();
     variables.insert("<PLAYER_NAME>".to_string(), player_name.to_string());
     settings

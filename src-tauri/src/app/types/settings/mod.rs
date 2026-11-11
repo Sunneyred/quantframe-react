@@ -84,3 +84,6 @@ pub use live_syndicate_wts_settings::*;
 
 pub mod syndicate_entry_setting;
 pub use syndicate_entry_setting::*;
+
+pub mod void_trader_settings;
+pub use void_trader_settings::*;

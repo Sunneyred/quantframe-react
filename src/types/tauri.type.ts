@@ -120,6 +120,15 @@ export namespace TauriTypes {
     items: ItemSettings;
     rivens: RivenSettings;
     syndicate: SyndicateSettings;
+    /** Void Trader: only changed through `vt_strategy_set`; the backend ignores it in `app_update_settings`. */
+    void_trader?: VoidTraderSettings;
+  }
+  export type TradingPreset = "scavenger" | "flipper" | "high_roller" | "riven_hunter" | "liquidate";
+  export interface VoidTraderSettings {
+    preset: TradingPreset;
+    smart_enabled: boolean;
+    strict_tiers: boolean;
+    locked_fields: string[];
   }
   export interface LiveScraperGeneralSettings {
     report_to_wfm: boolean;

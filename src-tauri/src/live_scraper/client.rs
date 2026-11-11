@@ -1,7 +1,7 @@
 use crate::{
     emit_error,
     enums::*,
-    live_scraper::modules::*,
+    live_scraper::{modules::*, void_smart_trader},
     notify_gui, play_sound, send_event, track_event,
     types::UIEvent,
     utils::{modules::states, OrderListExt},
@@ -85,7 +85,19 @@ impl LiveScraperState {
                     .unwrap_or(Instant::now());
 
                 while is_running.load(Ordering::SeqCst) {
-                    let app = states::app_state().expect("App state not initialized");
+                    let mut app = states::app_state().expect("App state not initialized");
+                    // Void Trader: re-read the signals (plat, stock, trades left) once per cycle,
+                    // then run the cycle on the effective settings. `app` is a local copy; the
+                    // saved settings are never changed.
+                    if let Err(e) = void_smart_trader::refresh().await {
+                        e.with_location(get_location!()).log("live_scraper.log");
+                    }
+                    match void_smart_trader::effective_settings() {
+                        Ok(effective) => app.settings.live_scraper = effective,
+                        Err(e) => {
+                            e.with_location(get_location!()).log("live_scraper.log");
+                        }
+                    }
                     // let wfm_client = app.wfm_client;
                     // println!("{}", wfm_client.order().cache_orders());
                     if matches!(

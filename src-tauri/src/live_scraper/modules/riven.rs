@@ -109,7 +109,8 @@ impl RivenModule {
                 })),
             );
 
-            let settings = states::get_settings()?.live_scraper.rivens;
+            // Void Trader: effective settings (preset + smart trader), not the raw saved ones.
+            let settings = crate::live_scraper::void_smart_trader::effective_settings()?.rivens;
             let weapon_info = cache
                 .weapon()
                 .get_by(&stock_riven.wfm_weapon_url)

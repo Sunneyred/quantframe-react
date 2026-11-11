@@ -8,6 +8,9 @@ pub struct LiveScraperSettings {
     pub items: ItemSettings,
     pub rivens: RivenSettings,
     pub syndicate: SyndicateSettings,
+    /// Void Trader: trading preset + smart trader switches.
+    #[serde(default)]
+    pub void_trader: VoidTraderSettings,
 }
 impl LiveScraperSettings {
     pub fn has_trade_mode(&self, mode: TradeMode) -> bool {
@@ -21,6 +24,7 @@ impl Default for LiveScraperSettings {
             items: ItemSettings::default(),
             rivens: RivenSettings::default(),
             syndicate: SyndicateSettings::default(),
+            void_trader: VoidTraderSettings::default(),
         }
     }
 }

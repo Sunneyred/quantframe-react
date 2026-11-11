@@ -2,7 +2,7 @@ import { AddMetric } from "@api/index";
 import { Header } from "@components/Layouts/Shared/Header";
 import { NavbarLinkProps, NavbarMinimalColored } from "@components/Layouts/Shared/NavbarMinimalColored";
 import { useAuthContext } from "@contexts/auth.context";
-import { faBoxes, faBug, faEnvelope, faGlobe, faHome, faInfoCircle, faMessage } from "@fortawesome/free-solid-svg-icons";
+import { faBoxes, faBug, faEnvelope, faGamepad, faGlobe, faHome, faInfoCircle, faMessage } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useTranslateComponent } from "@hooks/useTranslate.hook";
 import { faWarframeMarket, facTradingAnalytics } from "@icons";
@@ -42,6 +42,14 @@ export function LogInLayout() {
 
   const links = useMemo(
     () => [
+      {
+        align: "top",
+        id: "station",
+        link: "station",
+        icon: <FontAwesomeIcon size={"lg"} icon={faGamepad} />,
+        label: "Station",
+        onClick: (e: NavbarLinkProps) => handleNavigate(e),
+      },
       {
         align: "top",
         id: "home",

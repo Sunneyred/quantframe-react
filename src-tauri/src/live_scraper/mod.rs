@@ -8,3 +8,5 @@ pub use modules::*;
 
 pub mod types;
 pub use types::*;
+
+pub mod void_smart_trader;

@@ -52,6 +52,9 @@ pub async fn app_update_settings(
 ) -> Result<Settings, Error> {
     let mut app = app.lock()?;
     settings.notifications.custom_sounds = app.settings.notifications.custom_sounds.clone();
+    // Void Trader: the strategy block is only changed through `vt_strategy_set`, so a settings
+    // form that does not know about it can never reset the preset.
+    settings.live_scraper.void_trader = app.settings.live_scraper.void_trader.clone();
     let log_parser = log_parser.lock()?;
     log_parser.set_path(&settings.log_settings.ee_log_path)?;
 

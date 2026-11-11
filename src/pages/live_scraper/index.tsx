@@ -5,6 +5,7 @@ import { Box, Container, Tabs } from "@mantine/core";
 import { useLocalStorage } from "@mantine/hooks";
 import classes from "./LiveScraper.module.css";
 import { ItemPanel, RivenPanel, SyndicatePanel, WishListPanel } from "./Tabs";
+import { StrategyPanel } from "./StrategyPanel";
 
 export default function LiveScraperPage() {
   // Translate general
@@ -47,6 +48,7 @@ export default function LiveScraperPage() {
       <Box data-has-alert={useHasAlert()} className={classes.liveScraper}>
         <LiveScraperControl />
       </Box>
+      <StrategyPanel />
       <Tabs value={activeTab} onChange={(value) => setActiveTab(value || tabs[0].id)}>
         <Tabs.List>
           {tabs

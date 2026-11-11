@@ -1,0 +1,274 @@
+/* Void Trader station. Global (prefixed) classes because the engine creates label elements itself. */
+
+.vt-station-root {
+  position: relative;
+  height: calc(100vh - 65px - 2 * var(--mantine-spacing-md, 16px));
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  user-select: none;
+}
+
+.vt-station-host {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.vt-station-stage {
+  position: relative;
+  flex: none;
+  --vt-u: 2px;
+  background: #050412;
+  box-shadow:
+    0 0 0 1px rgba(232, 193, 90, 0.55),
+    0 0 0 3px rgba(5, 4, 18, 0.9),
+    0 0 0 4px rgba(42, 212, 230, 0.25),
+    0 12px 40px rgba(0, 0, 0, 0.6);
+}
+
+.vt-station-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.vt-station-labels {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.vt-station-label {
+  position: absolute;
+  white-space: nowrap;
+  line-height: 1;
+  font-family: "Rajdhani", "Segoe UI", sans-serif;
+  font-weight: 600;
+  color: #e9e4f5;
+}
+
+/* --- wall readout --- */
+.vt-station-readout-title {
+  font-family: "Orbitron", sans-serif;
+  font-size: calc(var(--vt-u) * 4.5);
+  letter-spacing: 0.25em;
+  color: #2ad4e6;
+  opacity: 0.9;
+}
+.vt-station-readout-plat {
+  font-family: "Orbitron", sans-serif;
+  font-size: calc(var(--vt-u) * 15);
+  color: #f6dc8a;
+  text-shadow:
+    0 0 calc(var(--vt-u) * 3) rgba(232, 193, 90, 0.7),
+    0 calc(var(--vt-u) * 0.5) 0 #5c4310;
+}
+.vt-station-readout-goal {
+  transform: translateX(-100%);
+  font-size: calc(var(--vt-u) * 6);
+  letter-spacing: 0.06em;
+  color: #e8c15a;
+}
+.vt-station-readout-today {
+  font-size: calc(var(--vt-u) * 7);
+  letter-spacing: 0.04em;
+  color: #b9fbff;
+  text-shadow: 0 0 calc(var(--vt-u) * 2) rgba(42, 212, 230, 0.5);
+}
+.vt-station-readout-today-hit {
+  color: #8cf0b4;
+}
+
+.vt-station-goal-line {
+  transform: translate(-50%, -100%);
+  font-family: "Orbitron", sans-serif;
+  font-size: calc(var(--vt-u) * 4.5);
+  letter-spacing: 0.12em;
+  color: #fff1b8;
+  text-shadow:
+    0 0 calc(var(--vt-u) * 1.5) #050412,
+    0 0 calc(var(--vt-u) * 1.5) #050412,
+    0 calc(var(--vt-u) * 0.5) 0 #050412;
+}
+
+.vt-station-sign {
+  transform: translate(-50%, -50%);
+  font-family: "Orbitron", sans-serif;
+  font-size: calc(var(--vt-u) * 5.5);
+  letter-spacing: 0.14em;
+  color: #e8c15a;
+  text-shadow: 0 0 calc(var(--vt-u) * 2) rgba(232, 193, 90, 0.6);
+}
+
+/* --- interact prompt --- */
+.vt-station-prompt {
+  transform: translate(-50%, -100%);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--vt-u) * 2);
+  padding: calc(var(--vt-u) * 1) calc(var(--vt-u) * 2.5) calc(var(--vt-u) * 1) calc(var(--vt-u) * 1);
+  font-size: calc(var(--vt-u) * 6.5);
+  color: #fff1b8;
+  background: rgba(5, 4, 18, 0.88);
+  border: 1px solid rgba(232, 193, 90, 0.7);
+  border-radius: calc(var(--vt-u) * 1.5);
+  animation: vt-station-bob 0.9s ease-in-out infinite;
+}
+.vt-station-prompt::before {
+  content: "E";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--vt-u) * 8);
+  height: calc(var(--vt-u) * 8);
+  font-family: "Orbitron", sans-serif;
+  font-size: calc(var(--vt-u) * 5.5);
+  color: #1a1206;
+  background: linear-gradient(135deg, #f6dc8a, #e8c15a 50%, #b8862b);
+  border-radius: calc(var(--vt-u) * 1);
+  box-shadow: 0 calc(var(--vt-u) * 0.75) 0 #5c4310;
+}
+@keyframes vt-station-bob {
+  0%,
+  100% {
+    margin-top: 0;
+  }
+  50% {
+    margin-top: calc(var(--vt-u) * -1.5);
+  }
+}
+
+/* --- customer offer bubble --- */
+.vt-station-bubble {
+  transform: translate(-50%, -100%);
+  padding: calc(var(--vt-u) * 1) calc(var(--vt-u) * 2.5);
+  font-size: calc(var(--vt-u) * 6.5);
+  color: #050412;
+  background: #f6dc8a;
+  border: 1px solid #fff1b8;
+  border-radius: calc(var(--vt-u) * 1.5);
+  box-shadow: 0 0 calc(var(--vt-u) * 4) rgba(232, 193, 90, 0.55);
+}
+.vt-station-bubble::before {
+  content: "! ";
+  font-family: "Orbitron", sans-serif;
+  color: #0f6a85;
+}
+.vt-station-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--vt-u) * -2);
+  width: calc(var(--vt-u) * 3);
+  height: calc(var(--vt-u) * 2);
+  margin-left: calc(var(--vt-u) * -1.5);
+  background: #f6dc8a;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+.vt-station-bubble-ping {
+  animation: vt-station-ping 0.5s ease-out;
+}
+@keyframes vt-station-ping {
+  0% {
+    transform: translate(-50%, -100%) scale(0.4);
+    background: #b9fbff;
+  }
+  60% {
+    transform: translate(-50%, -100%) scale(1.2);
+  }
+  100% {
+    transform: translate(-50%, -100%) scale(1);
+  }
+}
+
+.vt-station-floater {
+  transform: translate(-50%, -50%);
+  font-family: "Orbitron", sans-serif;
+  font-size: calc(var(--vt-u) * 11);
+  color: #fff1b8;
+  text-shadow:
+    0 0 calc(var(--vt-u) * 3) rgba(232, 193, 90, 0.9),
+    0 calc(var(--vt-u) * 0.75) 0 #5c4310;
+}
+
+/* --- page chrome --- */
+.vt-station-footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+.vt-station-hud {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vt-station-help {
+  text-align: center;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: rgba(233, 228, 245, 0.7);
+}
+.vt-station-help kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 4px;
+  margin: 0 1px;
+  font-family: "Orbitron", sans-serif;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  color: #e8c15a;
+  background: rgba(16, 13, 38, 0.9);
+  border: 1px solid rgba(232, 193, 90, 0.45);
+  border-radius: 3px;
+}
+
+.vt-station-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 4, 18, 0.45);
+}
+.vt-station-card {
+  width: min(420px, 92%);
+  background-color: rgba(12, 10, 31, 0.96) !important;
+  border: 1px solid rgba(232, 193, 90, 0.45) !important;
+  box-shadow: 0 0 30px rgba(232, 193, 90, 0.18);
+  user-select: text;
+}
+.vt-station-card-title {
+  font-family: "Orbitron", sans-serif;
+  letter-spacing: 0.08em;
+  color: #e8c15a;
+}
+.vt-station-quote {
+  padding: 8px 10px;
+  border-left: 2px solid #2ad4e6;
+  background: rgba(42, 212, 230, 0.07);
+  word-break: break-word;
+}
+.vt-station-command {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  color: #b9fbff;
+  word-break: break-all;
+}
