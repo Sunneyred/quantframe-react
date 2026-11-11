@@ -18,4 +18,50 @@ export class WfInventoryModule {
       mutationFn: () => this.client.sendInvoke<void>("wf_inventory_update"),
     });
   }
+  // Void Trader
+  async sellFinder(min_price?: number): Promise<SellFinderResult> {
+    return await this.client.sendInvoke<SellFinderResult>("vt_sell_finder", { min_price });
+  }
+  async platGoal(): Promise<PlatGoal> {
+    return await this.client.sendInvoke<PlatGoal>("vt_plat_goal");
+  }
+  async refresh(): Promise<void> {
+    return await this.client.sendInvoke<void>("wf_inventory_update");
+  }
+}
+
+export interface SellCandidate {
+  name: string;
+  wfm_url: string;
+  unique_name: string;
+  icon: string;
+  category: string;
+  quantity: number;
+  unit_price: number;
+  total: number;
+  volume: number;
+  week_price_shift: number;
+  basis: "exact" | "max_rank" | "arcane_estimate";
+  sub_type?: TauriTypes.SubType;
+  in_stock: boolean;
+}
+export interface SellFinderResult {
+  connected: boolean;
+  platinum: number;
+  trades_remaining: number;
+  mastery_rank: number;
+  owned_tradable: number;
+  unpriced: number;
+  total_value: number;
+  items: SellCandidate[];
+}
+export interface PlatGoal {
+  platinum: number;
+  floor: number;
+  goal: number;
+  progress: number;
+  daily_target: number;
+  avg_daily_profit: number;
+  profit_today: number;
+  balance_is_live: boolean;
 }

@@ -351,6 +351,8 @@ pub fn run() {
             commands::syndicate_price::export_syndicate_item_price_data,
             // Riven commands
             commands::riven::riven_prices_lookup,
+            commands::void_sell_finder::vt_sell_finder,
+            commands::void_sell_finder::vt_plat_goal,
             commands::void_riven_market::vt_riven_market_scan,
             commands::void_riven_market::vt_riven_market_stop,
             commands::void_riven_market::vt_riven_market_status,

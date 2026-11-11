@@ -14,6 +14,7 @@ import { TransactionListItem } from "@components/DataDisplay/TransactionListItem
 import { useHasAlert } from "@hooks/useHasAlert.hook";
 import { useTauriEvent } from "@hooks/useTauriEvent.hook";
 import { BestByCategoryTable } from "@components/DataDisplay/BestByCategoryTable";
+import { PlatGoalBar } from "@components/Shared/PlatGoalBar";
 import { BarChartFinancialSummary } from "../../components/DataDisplay/BarChartFinancialSummary";
 
 export default function HomePage() {
@@ -31,6 +32,7 @@ export default function HomePage() {
   useTauriEvent(TauriTypes.Events.RefreshTransactions, handleRefresh, []);
   return (
     <Container size={"100%"}>
+      <PlatGoalBar />
       <Grid className={classes.wrapper} data-has-alert={useHasAlert()}>
         <Grid.Col span={4}>
           <StatsWithIcon

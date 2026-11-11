@@ -1,0 +1,38 @@
+.root {
+  border-color: rgba(232, 193, 90, 0.35);
+}
+.label {
+  letter-spacing: 0.14em;
+}
+.plat {
+  font-family: Orbitron, Rajdhani, sans-serif;
+  font-size: rem(26px);
+  font-weight: 600;
+  color: #e8c15a;
+  text-shadow: 0 0 12px rgba(232, 193, 90, 0.45);
+  line-height: 1.1;
+}
+.track {
+  position: relative;
+  height: rem(14px);
+  border-radius: rem(7px);
+  background: rgba(5, 4, 18, 0.8);
+  border: 1px solid rgba(232, 193, 90, 0.3);
+  overflow: hidden;
+}
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, #966b20, #e8c15a 60%, #fff1b8);
+  box-shadow: 0 0 12px rgba(232, 193, 90, 0.6);
+  transition: width 600ms ease;
+}
+.today {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: rem(3px);
+  background: #2ad4e6;
+  box-shadow: 0 0 6px rgba(42, 212, 230, 0.8);
+  transition: width 600ms ease;
+}
