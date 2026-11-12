@@ -40,6 +40,9 @@ export class ObservatoryRoom {
   private corridor: { group: THREE.Group; update(dt: number, t: number): void };
   private labels: CanvasLabel[] = [];
   private focused: MarketStar | null = null;
+  /** Sound: where the spire stands (world), and whether the current undercut was already announced. */
+  private spireWorld = new THREE.Vector3();
+  private cutHeard = false;
 
   constructor(
     private engine: Engine,
@@ -63,6 +66,7 @@ export class ObservatoryRoom {
 
     // --- the Orrery
     const spireWorld = this.root.localToWorld(SPIRE_AT.clone());
+    this.spireWorld.copy(spireWorld).setY(2.4);
     this.orrery = new Orrery(interact, { onFocus: (s) => hooks.onFocus(s) }, () => ({ h: engine.viewport.h, fov: engine.camera.fov, pr: engine.renderer.getPixelRatio() }), new THREE.Vector3(SPIRE_AT.x, SPIRE_TOP + 0.4, SPIRE_AT.z));
     this.root.add(this.orrery.group);
     world.circle(0, OBS_Z, 0.28); // the axis pole
@@ -290,15 +294,25 @@ export class ObservatoryRoom {
   }
 
   setFocus(star: MarketStar | null) {
+    const same = !!star && !!this.focused && star.wfm_url === this.focused.wfm_url && star.flags.riven === this.focused.flags.riven;
     this.focused = star;
     this.orrery.setFocus(star?.wfm_url ?? null, star?.flags.riven ?? false);
     this.spire.setItem(star);
     this.ribbon.setItem(star);
+    if (same) return; // the same item with fresh numbers
+    this.cutHeard = false;
+    // a chime at the star: pitch and brightness follow its trend
+    if (star) this.engine.audio.market.focus({ trend: star.trend, dir: star.trend_dir, position: this.orrery.starWorld(star.wfm_url) ?? this.spireWorld });
   }
 
   setBook(book: OrderBook | null, loading = false) {
     this.spire.setLoading(loading);
     if (book || !loading) this.spire.setBook(book);
+    if (!book) return;
+    // an undercut that was not there before: the alert sounds at the spire
+    const cut = book.summary.undercut_by !== null && book.summary.undercut_by !== undefined;
+    if (cut && !this.cutHeard) this.engine.audio.market.alert({ position: this.spireWorld });
+    this.cutHeard = cut;
   }
 
   setHistory(star: MarketStar | null, h: PriceHistory | null, loading = false) {

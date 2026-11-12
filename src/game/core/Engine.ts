@@ -7,6 +7,7 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { CSS3DRenderer } from "three/examples/jsm/renderers/CSS3DRenderer.js";
 import { CopyShader } from "three/examples/jsm/shaders/CopyShader.js";
 import { Palette } from "../art/materials";
+import { AudioSystem } from "../audio/AudioSystem";
 import { makePlayerAvatar } from "../entities/figures";
 import { CollisionWorld } from "./collision";
 import { Emitter, store, stored } from "./events";
@@ -90,6 +91,8 @@ export class Engine {
   readonly player: Player;
   readonly interact: InteractSystem;
   readonly screens: ScreenManager;
+  /** Sound (audio/AudioSystem.ts): context, buses, listener, music, one-shots. */
+  readonly audio: AudioSystem;
   quality: Quality;
   room: Room | null = null;
 
@@ -169,6 +172,7 @@ export class Engine {
     this.applyQuality();
     this.resize();
     document.addEventListener("visibilitychange", this.onVisibility);
+    this.audio = new AudioSystem(this);
   }
 
   get element() {
@@ -361,6 +365,7 @@ export class Engine {
 
     this.interact.update(this.camera, this.player.eye(this.eye), control, t);
     this.screens.update(this.camera);
+    this.audio.update(dt);
     if (render) this.render();
   }
 
@@ -418,6 +423,7 @@ export class Engine {
     if (this.disposed) return;
     this.stop();
     this.disposed = true;
+    this.audio.dispose();
     document.removeEventListener("visibilitychange", this.onVisibility);
     this.resizeObs.disconnect();
     this.input.dispose(); // releases pointer lock

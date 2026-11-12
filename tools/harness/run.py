@@ -20,6 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib import HERE, ROOT, Server, Suite  # noqa: E402
 import scenarios_shell  # noqa: E402
+from scenarios_audio import scenario_audio  # noqa: E402
 
 DEFAULT_SHOTS = HERE / "shots"
 
@@ -2022,6 +2023,7 @@ SCENARIOS = {
     "small": lambda s: scenario_layout(s, 1280, 800, classic=False, alerts=False),
     "game": lambda s: scenario_game(s),
     "shell": lambda s: scenarios_shell.scenario_shell(s, sys.modules[__name__]),
+    "audio": lambda s: scenario_audio(s),
 }
 
 

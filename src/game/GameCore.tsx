@@ -17,10 +17,10 @@ import { ModalRouter } from "./modalRouter";
 import { makeAnnouncement, useNotificationCapture, type Announcement } from "./notify";
 import { ObservatoryRoom } from "./rooms/observatory";
 import { Ship } from "./rooms/ship";
-import { VaultRoom } from "./rooms/vault";
 import { fitScreenToView } from "./rooms/vault/terminals";
 import { fallBackToClassic, isClassic, watchdogMs } from "./shellMode";
 import { ServiceDeck } from "./ui/ServiceDeck";
+import { PA_SOUND, VaultRoom } from "./rooms/vault";
 import { ConsoleScreen, PAScreen, ReservoirScreen, SignScreen } from "./ui/Ambient";
 import { DeskScreen } from "./ui/DeskScreen";
 import { MarketConsole } from "./ui/MarketConsole";
@@ -94,6 +94,7 @@ export default function GameCore() {
 
   const announce = useCallback((a: Announcement) => {
     setAnnouncements((list) => [a, ...list].slice(0, 12));
+    liveRef.current?.engine.audio.play("announce", { position: PA_SOUND, tone: a.tone });
   }, []);
   useNotificationCapture(announce);
 

@@ -3,7 +3,7 @@ import api from "@api/index";
 import { upperFirst } from "@mantine/hooks";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { join, resolveResource } from "@tauri-apps/api/path";
-import { isCustomSound, stripCustomSoundPrefix } from "@utils/sound";
+import { getAppSoundScale, isCustomSound, stripCustomSoundPrefix } from "@utils/sound";
 
 export interface GroupByDateSettings {
   labels?: string[];
@@ -39,7 +39,7 @@ export const PlaySound = async (fileName: string, volume: number = 1.0) => {
     }
 
     const audio = new Audio(assetUrl);
-    audio.volume = volume;
+    audio.volume = volume * getAppSoundScale();
     await audio.play();
   } catch (error) {
     console.error(`Error playing sound ${fileName}:`, error);
@@ -48,7 +48,7 @@ export const PlaySound = async (fileName: string, volume: number = 1.0) => {
       const resourcePath = await resolveResource(`resources/sounds/cat_meow.mp3`);
       const assetUrl = convertFileSrc(resourcePath);
       const audio = new Audio(assetUrl);
-      audio.volume = volume;
+      audio.volume = volume * getAppSoundScale();
       audio.play();
     } catch (fallbackError) {
       console.error("Error playing fallback sound:", fallbackError);
