@@ -5,6 +5,7 @@ import type { Engine, Room } from "../../core/Engine";
 import type { Quality } from "../../core/quality";
 import type { Screen } from "../../core/screens";
 import type { Buyer, GoalSnapshot } from "../../../station/engine/logic";
+import { buildAudioProps, type AudioProps } from "./audioProps";
 import { Customers, DOOR_DEG } from "./customers";
 import { Reservoir } from "./reservoir";
 import { APOTHEM, buildShell, type Shell } from "./shell";
@@ -23,6 +24,10 @@ export interface VaultHooks {
 
 export type VaultScreens = Record<"reservoir" | "desk" | "stock" | "pa" | "console" | "sign", Screen>;
 
+/** Where a sale is heard: the pour into the reservoir tank. */
+export const RESERVOIR_SOUND = { x: 0, y: 2.6, z: 0 };
+/** Where announcements are heard: the PA display. */
+export const PA_SOUND = polar(120, APOTHEM - 0.3, 3.55);
 const DESK_DEG = 90;
 const DESK_R = 8.2;
 
@@ -41,6 +46,8 @@ export class VaultRoom implements Room {
   private goal: GoalSnapshot | null = null;
   private updates: Array<(dt: number, t: number) => void> = [];
   private labels: CanvasLabel[] = [];
+  /** The tape deck and the master volume panel (audioProps.ts). */
+  readonly audioProps: AudioProps;
 
   constructor(
     private engine: Engine,
@@ -140,6 +147,8 @@ export class VaultRoom implements Room {
     this.plaque("ARRIVALS", "TRADERS ENTER HERE", polar(DOOR_DEG, APOTHEM - 0.14, 5.2), faceCentre(DOOR_DEG));
     this.banners();
     this.sculptures();
+    this.audioProps = buildAudioProps(engine);
+    this.updates.push(this.audioProps.update);
 
     this.screens = { reservoir: reservoirScreen, desk: deskScreen, stock: stockScreen, pa, console: consoleScreen, sign };
     this.lever = this.leverGroup;
@@ -449,6 +458,7 @@ export class VaultRoom implements Room {
   surge(gain: number) {
     const span = this.goal ? Math.max(1, this.goal.goal - this.goal.floor) : 150;
     this.reservoir.surge(gain, span);
+    this.engine.audio.market.sale({ position: RESERVOIR_SOUND, amount: gain });
   }
 
   setQueue(queue: Buyer[], selected: string | null) {
@@ -517,6 +527,7 @@ export class VaultRoom implements Room {
   dispose() {
     this.reservoir.dispose();
     this.customers.dispose();
+    this.audioProps.dispose();
     for (const l of this.labels) l.dispose();
   }
 }

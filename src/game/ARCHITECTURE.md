@@ -24,6 +24,8 @@ Route `game` inside the app (`GamePage.tsx`, lazy chunk), or standalone on demo 
 - `modalRouter.ts`: app modals routed onto the in-world Comms display.
 - `ui/`: the React content shown on screens. `GameCore.tsx` owns the engine, the data and the portals.
 - `notify.ts`: in-world announcements and the capture of Mantine notifications.
+- `audio/`: all sound, synthesised with the Web Audio API (no audio files). See "Audio" below.
+- `rooms/vault/audioProps.ts`: the tape deck and the master volume panel.
 
 ## Adding a room
 
@@ -98,3 +100,66 @@ engine as soon as `location.pathname` differs from the one it mounted on.
   a red pulse runs down the column when an undercut appears.
 - Data (`ui/useMarket.ts`): overview on mount and on shop changes; order book on focus and every 45 s while
   focused (the backend caches ~40 s per item and spaces requests); history once per focus.
+
+## Audio
+
+Everything is synthesised live (`src/game/audio/`); there are no samples and no audio files, and all
+controls are objects in the world. `engine.audio` is the `AudioSystem`; Engine.ts only constructs it,
+calls `audio.update(dt)` after the camera pose, and disposes it.
+
+- `AudioSystem.ts`: one `AudioContext`, created on the first key or pointer press (autoplay policy),
+  suspended while the tab is hidden, closed on dispose. Listener = the camera, every frame. Positional
+  one-shots go through an HRTF `PannerNode` (inverse distance, `ref` per voice) plus a send to the room
+  reverb. Footsteps (the avatar's stride clock, fed by the speed really moved), dock / undock, clicks and
+  hover ticks on docked screens are wired here; settings persist in `localStorage["vt_game_audio"]`
+  (master, muted, music, track, playing).
+- `graph.ts`: buses `music`, `sfx`, `market`, `ambience` -> `master` (volume, mute) -> 22 Hz highpass ->
+  limiter (compressor, make-up gain trimmed out) -> soft clip (ceiling -1.4 dBFS). Two generated impulse
+  responses (Vault, Observatory); `setRoom` crossfades their returns.
+- `voices.ts`: every one-shot as a function `(rack, out, t, opts) => endTime`, and the table `VOICES`
+  (bus, level, reference distance, reverb send). `util.ts`: `Rack` (the nodes of one voice, released when
+  it ends), noise buffers, envelopes, the seeded PRNG.
+- `music.ts`: the tapes. `Composer` (pure, seeded) writes bar after bar: a walk over the degrees of a
+  mode, close voicings, a plucked line or an arpeggio, brushed drums in some sections. `TapePlayer`
+  schedules bars ~1.2 s ahead: detuned saw/triangle pads through a lowpass with two slow LFOs, FM
+  electric piano / FM bell / glass plucks with an echo, a sub bass, wow and flutter (a modulated delay),
+  tape saturation, hiss, and a duck on every pulse. Changing tape crossfades over ~3 s.
+- `ambience.ts`: the room tone of each hall (crossfaded by where the player is) and `MarketTexture`, a
+  granular layer with a density 0..1.
+- The music comes from the tape deck's speaker (equal-power panner) plus a bleed through the ship that
+  gets duller in the corridor and the Observatory.
+
+API:
+
+```ts
+engine.audio.play("sale", { position, amount });          // any name in VOICES; position is optional
+engine.audio.chime({ pitch, brightness, position, gain }); // the tuned glass chime (Hz, 0..1)
+engine.audio.market.sale({ position, amount });
+engine.audio.market.alert({ position });
+engine.audio.market.focus({ trend, dir, position });       // chime pitch/brightness from a trend
+engine.audio.market.texture.set(0.4);                      // market texture density 0..1 (default 0.12)
+engine.audio.robot.servo({ position, pitch, duration });   // also .whirr(...) and .beep({ mood })
+engine.audio.music.next() / prev() / toggle() / setVolume(v) / select(id);
+engine.audio.setMaster(v); engine.audio.toggleMute();
+engine.audio.events.on("settings", fn);                    // for props that show the state
+```
+
+`play` returns false (and counts a drop) when nothing sounded: no gesture yet, tab hidden, or more than
+40 one-shots alive. Wired events: `rooms/ship.ts` reports the room (`setRoom`: reverb, room tone, floor
+surface, an arch sound), `VaultRoom.surge` plays the sale at the reservoir, `ObservatoryRoom.setFocus`
+the trend chime at the star and `setBook` the alert at the spire when an undercut appears, `GameCore`'s
+`announce` a quiet chime at the PA display.
+
+Adding a sound: write a voice in `voices.ts` (build nodes with the `Rack`, start sources at their time,
+return when it is silent; fade the tail, never cut it), add it to `VOICES`, call
+`engine.audio.play("name", { position })` from the room. A continuous layer gets its own `Rack` on a bus
+(see `roomTone`) and must be killed on dispose. Then run `python3 tools/harness/audio_render.py`: it
+renders every tape, voice and layer offline through the real graph, fails on clipping, DC, peaks above
+-1 dBFS, music brighter than allowed above 8 kHz or louder than the alerts, and writes WAVs and
+spectrograms (look at them). `tools/harness/run.py --only audio` tests the wiring through the dev
+counters `engine.audio.debug` and `window.__vtAudioDebug` (dev builds only).
+
+The classic app's notification sounds (`PlaySound` in `utils/helper.ts`, driven by the Rust `play_sound`
+event) are HTML audio elements outside this graph. While the game is mounted they are scaled by the
+in-world master volume and mute through `setAppSoundScale` (`utils/sound.ts`); on unmount the scale
+returns to 1. No Rust change.

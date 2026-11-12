@@ -65,6 +65,7 @@ answered with a 1x1 PNG) and counted.
 | `layout` | the classic routes and every station panel, card and overlay at the app's default window size (read from `src-tauri/tauri.conf.json`) |
 | `small` | every station panel, card and overlay at 1280x800, with no alert showing (pages use different offsets then) |
 | `game` | the 3D game (`/game`): walk from the Vault into the Market Observatory, focus a star with E, order book on the spire, an undercut, the Market Console (search, filters, stock card), an app modal routed onto the Comms display, third person, leaving for a lazy route |
+| `audio` | the 3D game's sound, structurally (`scenarios_audio.py`): no context before a gesture, footsteps at stride rate, the tape deck and the master panel through E / Shift+E / wheel, persistence across a reload, sale / focus / undercut voices at their positions, context closed and nodes released over several remounts |
 | `dist` | builds the production bundle (`pnpm build`) and runs a smoke pass on it: boot, routes, rooms, every terminal, lever, a sale, events (`--skip-build` uses the existing `dist/`) |
 
 All but `dist` run on the Vite dev server, where the station exposes its game object
@@ -104,6 +105,15 @@ The mock is independent of the scenarios. To test new screens:
   unreachable or covered.
 - The game handle `window.__vtStation` is created by the station in dev builds only; a new game
   should expose its own dev-only handle the same way if tests need to drive it.
+
+## Sound
+
+Sound cannot be heard here. `run.py --only audio` checks the wiring through dev-only counters;
+`python3 tools/harness/audio_render.py` renders every tape, one-shot and ambience layer offline
+(OfflineAudioContext, through the game's real bus graph), measures peak, loudness, DC offset, spectral
+centroid, energy above 8 kHz and clipping, fails on the limits listed at the top of the script, and
+writes WAVs and spectrogram PNGs to `/tmp/stage1c-audio` (or `--out`). Look at the PNGs. Neither
+replaces listening.
 
 ## What it cannot prove
 

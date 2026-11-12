@@ -30,6 +30,7 @@ export class Ship implements Room {
   update(dt: number, t: number) {
     this.vault.update(dt, t);
     this.observatory.update(dt, t);
+    this.engine.audio.setRoom(this.where);
   }
 
   dispose() {
