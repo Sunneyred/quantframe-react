@@ -122,7 +122,7 @@ pub fn price_item(
     }
 }
 
-fn merge_owned(lists: &[&Vec<WFInvItemRaw>]) -> HashMap<String, i64> {
+pub(crate) fn merge_owned(lists: &[&Vec<WFInvItemRaw>]) -> HashMap<String, i64> {
     let mut owned: HashMap<String, i64> = HashMap::new();
     for list in lists {
         for item in list.iter() {

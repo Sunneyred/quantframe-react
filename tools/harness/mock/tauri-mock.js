@@ -1039,6 +1039,131 @@
     };
   };
 
+  // ------------------------------------------------------------------------------------------
+  // Market Observatory (src-tauri/src/commands/void_market.rs): vt_market_overview,
+  // vt_order_book, vt_price_history. Deterministic per item (hash, not the shared rnd).
+  // The catalogue items carry the real flags (stock, live orders, wish list, inventory);
+  // synthetic filler brings the sky to ~1,500 items like the real price cache.
+  // ------------------------------------------------------------------------------------------
+  const h01 = (str, salt = 0) => {
+    let x = 0x811c9dc5 ^ salt;
+    for (let i = 0; i < str.length; i++) x = Math.imul(x ^ str.charCodeAt(i), 0x01000193);
+    x ^= x >>> 15;
+    x = Math.imul(x, 0x2c1b3c6d);
+    x ^= x >>> 12;
+    return (x >>> 0) / 4294967296;
+  };
+  const logn = (key, salt, m, sp) => {
+    const u = h01(key, salt) * 0.998 + 0.001;
+    const v = h01(key, salt + 1) * 0.998 + 0.001;
+    return m * Math.pow(sp, Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v));
+  };
+  const marketRow = (url, name, category, price, volume, extra) => {
+    const unknown = h01(url, 91) < 0.05;
+    let trend = Math.max(-0.5, Math.min(0.5, (h01(url, 31) - 0.5) * 0.3));
+    if (h01(url, 37) < 0.06) trend = (h01(url, 41) < 0.5 ? -1 : 1) * (0.15 + h01(url, 43) * 0.25);
+    const avg = Math.max(1, Math.round(price * 10) / 10);
+    return {
+      wfm_url: url, wfm_id: url, name, category, avg_price: avg, median: Math.round(avg),
+      min_price: Math.max(1, Math.round(avg * 0.7)), max_price: Math.round(avg * 1.4), volume: Math.round(volume * 10) / 10,
+      moving_avg: unknown ? null : Math.round((avg / (1 + trend)) * 100) / 100,
+      trend: unknown ? 0 : Math.round(trend * 1000) / 1000,
+      trend_dir: unknown ? "unknown" : trend > 0.05 ? "rising" : trend < -0.05 ? "falling" : "flat",
+      profit_margin: Math.round(avg * 0.2 * 10) / 10, variant: "",
+      flags: { stock: false, live_order: false, wish: false, inventory: false, riven: false }, owned: 0, ...extra,
+    };
+  };
+  const FILLER_CATS = [["prime", 430, 12], ["set", 120, 60], ["mod", 260, 15], ["arcane", 90, 20], ["relic", 290, 5], ["other", 70, 25]];
+  const FILLER_WORDS = ["Aurora", "Cinder", "Halcyon", "Meridian", "Obelisk", "Quasar", "Sable", "Tessera", "Umbra", "Vesper", "Zenith", "Lumen", "Corvid", "Ember", "Solace"];
+  let marketFiller = null;
+  const fillerItems = () => {
+    if (marketFiller) return marketFiller;
+    marketFiller = [];
+    for (const [cat, n, med] of FILLER_CATS)
+      for (let i = 0; i < n; i++) {
+        const w = FILLER_WORDS[i % FILLER_WORDS.length];
+        const name = cat === "relic" ? `${["Lith", "Meso", "Neo", "Axi"][i % 4]} ${String.fromCharCode(65 + (i % 23))}${10 + Math.floor(i / 23)} Relic` : `Mock ${w} ${cat === "set" ? `Prime Set ${i}` : cat === "prime" ? `Prime Part ${i}` : cat === "arcane" ? `Arcane ${i}` : `${cat} ${i}`}`;
+        const url = slug(name);
+        marketFiller.push(marketRow(url, name, cat, logn(url, 1, med, 1.9), logn(url, 2, 20, 2.1), { variant: cat === "mod" ? "r10" : cat === "relic" ? "intact" : "" }));
+      }
+    return marketFiller;
+  };
+  const marketOverview = () => {
+    const live = new Set(state.orders.filter((o) => o.type === "sell").map((o) => o.properties && o.properties.wfm_url));
+    const stocked = new Set(state.stockItems.map((r) => r.wfm_url));
+    for (const r of state.stockItems) if (r.status === "live" && !r.is_hidden) live.add(r.wfm_url);
+    const wished = new Set(state.wishList.map((r) => r.wfm_url));
+    const owned = new Map(state.owned.map((o) => [o.item.wfmUrl, o.quantity]));
+    const rows = items.filter((i) => i._price > 0).map((i) =>
+      marketRow(i.wfmUrl, i.name, categoryOf(i.tags), i._price, i._volume, {
+        wfm_id: i.wfmId,
+        variant: i._maxRank ? `r${i._maxRank}` : "",
+        flags: { stock: stocked.has(i.wfmUrl), live_order: live.has(i.wfmUrl), wish: wished.has(i.wfmUrl), inventory: owned.has(i.wfmUrl), riven: false },
+        owned: owned.get(i.wfmUrl) || 0,
+      }),
+    );
+    const stockedRivens = new Set(state.stockRivens.map((r) => r.wfm_weapon_url));
+    const rivens = state.rivenPrices.map((r) => ({ ...marketRow(r.wfm_url, `${r.name} Riven`, "riven", r.median_price, r.volume), wfm_id: r.wfm_id, moving_avg: null, flags: { stock: stockedRivens.has(r.wfm_url), live_order: state.stockRivens.some((x) => x.wfm_weapon_url === r.wfm_url && x.status === "live"), wish: false, inventory: false, riven: true } }));
+    const all = [...rows, ...fillerItems(), ...rivens];
+    return { items: all, generated_at: iso(Date.now()), trend_basis: "Relative gap between the cached average price and its moving average ((avg - moving_avg) / moving_avg); flat within 5 %. Rivens: latest scan median against a scan a day or more older.", price_rows: rows.length + marketFiller.length, rivens: rivens.length, history_days: 0 };
+  };
+  state.marketBooks = {};
+  const STATUSES = ["ingame", "ingame", "online", "online", "offline"];
+  const marketBook = (url, variant) => {
+    const all = marketOverview().items;
+    const star = all.find((i) => i.wfm_url === url);
+    if (!star) throw rustError("VoidTrader:Market", `Failed to read the order book of ${url}`, { cause: "ApiError: NotFound" });
+    if (!state.marketBooks[url]) {
+      const p = star.median || 10;
+      const mine = state.stockItems.find((r) => r.wfm_url === url && r.status === "live" && r.list_price);
+      const floor = mine ? mine.list_price + 1 : Math.round(p * 0.95);
+      const v = star.variant;
+      const ord = (side, price, k, own) => ({ id: `${url}-${side}-${k}`, side, platinum: price, quantity: 1 + Math.floor(h01(url, k + 7) * 6), ...(v.startsWith("r") ? { rank: Number(v.slice(1)) } : {}), ...(v && !v.startsWith("r") ? { subtype: v } : {}), variant: v, user: own ? state.user.wfm_username : `Trader${Math.floor(h01(url, k) * 900 + 100)}`, status: own ? "ingame" : STATUSES[Math.floor(h01(url, k + 3) * STATUSES.length)], reputation: Math.floor(h01(url, k + 5) * 200), own, updated_at: iso(NOW - k * 600000) });
+      const orders = [];
+      for (let k = 0; k < 10; k++) orders.push(ord("sell", floor + Math.round(k * Math.max(1, p * 0.04) * (0.6 + h01(url, k))), k, false));
+      for (let k = 0; k < 6; k++) orders.push(ord("buy", Math.max(1, Math.round(p * 0.82 - k * Math.max(1, p * 0.04))), 20 + k, false));
+      if (mine) orders.push(ord("sell", mine.list_price, 99, true));
+      state.marketBooks[url] = orders;
+    }
+    const orders = state.marketBooks[url];
+    const variants = star.variant ? [{ key: star.variant, label: star.variant.startsWith("r") ? `Rank ${star.variant.slice(1)}` : star.variant[0].toUpperCase() + star.variant.slice(1), sells: orders.filter((o) => o.side === "sell").length, buys: orders.filter((o) => o.side === "buy").length, sells_ingame: orders.filter((o) => o.side === "sell" && o.status === "ingame").length }] : [];
+    const sells = orders.filter((o) => o.side === "sell").sort((a, b) => a.platinum - b.platinum);
+    const buys = orders.filter((o) => o.side === "buy").sort((a, b) => b.platinum - a.platinum);
+    const mn = (xs) => (xs.length ? Math.min(...xs) : null);
+    const mx = (xs) => (xs.length ? Math.max(...xs) : null);
+    const bsi = mn(sells.filter((o) => o.status === "ingame").map((o) => o.platinum));
+    const bbi = mx(buys.filter((o) => o.status === "ingame").map((o) => o.platinum));
+    const ownSell = mn(sells.filter((o) => o.own).map((o) => o.platinum));
+    const other = mn(sells.filter((o) => !o.own && o.status === "ingame").map((o) => o.platinum));
+    const cut = ownSell !== null && other !== null && other < ownSell ? ownSell - other : null;
+    return {
+      wfm_url: url, name: star.name, variant: star.variant, variants, sells: clone(sells), buys: clone(buys),
+      summary: { best_sell_ingame: bsi, best_sell_online: mn(sells.filter((o) => o.status !== "offline").map((o) => o.platinum)), best_sell_any: mn(sells.map((o) => o.platinum)), best_buy_ingame: bbi, best_buy_any: mx(buys.map((o) => o.platinum)), spread: bsi !== null && bbi !== null ? bsi - bbi : null, sellers_ingame: sells.filter((o) => o.status === "ingame").length, buyers_ingame: buys.filter((o) => o.status === "ingame").length, sell_count: sells.length, buy_count: buys.length, own_sell: ownSell, own_buy: mx(buys.filter((o) => o.own).map((o) => o.platinum)), undercut_by: cut, own_is_best: ownSell !== null && cut === null },
+      fetched_at: iso(Date.now()), age_secs: 0, from_cache: false, ttl_secs: 40,
+    };
+  };
+  /** Test helper: an in-game seller undercuts your order on this item (next vt_order_book shows it). */
+  const marketUndercut = (url, by = 2) => {
+    const own = (state.marketBooks[url] || []).find((o) => o.own && o.side === "sell");
+    if (!own) return false;
+    state.marketBooks[url].push({ ...own, id: `${url}-cut-${Date.now()}`, platinum: Math.max(1, own.platinum - by), user: "UndercutterX", own: false, status: "ingame" });
+    return true;
+  };
+  const marketHistory = (url, riven) => {
+    const star = marketOverview().items.find((i) => i.wfm_url === url && (!riven || i.flags.riven));
+    if (!star) return { wfm_url: url, source: "cache_snapshot", note: "No price data for this item.", points: [], snapshot: null, variant: "" };
+    const snapshot = { avg: star.avg_price, min: star.min_price, max: star.max_price, median: star.median, volume: star.volume, moving_avg: star.moving_avg, variant: star.variant };
+    const n = riven ? 5 : 90;
+    const points = [];
+    for (let i = 0; i < n; i++) {
+      const avg = Math.max(1, star.avg_price * (1 - (star.trend || 0) * (1 - i / (n - 1)) + (h01(url, 200 + i) - 0.5) * 0.08));
+      points.push({ date: iso(NOW - (n - 1 - i) * DAY).slice(0, 10) + "T00:00:00Z", avg: Math.round(avg * 10) / 10, min: Math.max(1, Math.round(avg * 0.8)), max: Math.round(avg * 1.25), median: Math.round(avg), volume: Math.round(star.volume * (0.6 + h01(url, 300 + i) * 0.8)) });
+    }
+    return riven
+      ? { wfm_url: url, source: "riven_scans", note: `${n} riven market scans of live buyout auctions (Void Trader's own scans).`, points, snapshot, variant: "" }
+      : { wfm_url: url, source: "wfm_statistics_90d", note: `warframe.market closed trades, last ${n} days.`, points, snapshot, variant: star.variant };
+  };
+
   const commands = {
     // --- app
     initialized: () => state.started,
@@ -1404,6 +1529,9 @@
       const base = state.rivenPrices.find((r) => r.wfm_url === wfmUrl);
       return base ? [0, 1, 2, 3, 4].map((d) => ({ ...base, datetime: iso(NOW - d * DAY), median_price: Math.round(base.median_price * (1 - d * 0.02)) })) : [];
     },
+    vt_market_overview: () => marketOverview(),
+    vt_order_book: ({ wfmUrl, variant }) => marketBook(wfmUrl, variant),
+    vt_price_history: ({ wfmUrl, riven }) => marketHistory(wfmUrl, !!riven),
     vt_riven_market_status: () => clone(state.rivenScan),
     vt_riven_market_scan: () => {
       if (!state.rivenScan.running) {
@@ -1769,6 +1897,8 @@
   // ------------------------------------------------------------------------------------------
   const H = {
     state,
+    /** Market Observatory: an in-game seller undercuts your sell order on `url` (returns false without one). */
+    marketUndercut,
     options: OPTIONS,
     calls: [],
     counts: {},

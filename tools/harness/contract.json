@@ -1352,10 +1352,57 @@
   },
   "returns": "Result<(), Error>"
  },
+ "vt_market_overview": {
+  "file": "src-tauri/src/commands/void_market.rs",
+  "args": {},
+  "returns": "Result<MarketOverview, Error>"
+ },
+ "vt_order_book": {
+  "file": "src-tauri/src/commands/void_market.rs",
+  "args": {
+   "wfmUrl": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "variant": {
+    "optional": true,
+    "kind": "string",
+    "rust": "Option<String>"
+   },
+   "force": {
+    "optional": true,
+    "kind": "bool",
+    "rust": "Option<bool>"
+   }
+  },
+  "returns": "Result<OrderBook, Error>"
+ },
  "vt_plat_goal": {
   "file": "src-tauri/src/commands/void_sell_finder.rs",
   "args": {},
   "returns": "Result<PlatGoal, Error>"
+ },
+ "vt_price_history": {
+  "file": "src-tauri/src/commands/void_market.rs",
+  "args": {
+   "wfmUrl": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "variant": {
+    "optional": true,
+    "kind": "string",
+    "rust": "Option<String>"
+   },
+   "riven": {
+    "optional": true,
+    "kind": "bool",
+    "rust": "Option<bool>"
+   }
+  },
+  "returns": "Result<PriceHistory, Error>"
  },
  "vt_riven_market_scan": {
   "file": "src-tauri/src/commands/void_riven_market.rs",

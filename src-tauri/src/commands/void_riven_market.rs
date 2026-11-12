@@ -75,6 +75,18 @@ fn save_store(store: &RivenMarketStore) -> Result<(), Error> {
     })
 }
 
+/// Every stored riven scan row (all snapshots). Blocking: call from a blocking task.
+pub(crate) fn all_rows() -> Vec<RivenPrice> {
+    load_store().rows
+}
+
+/// Stored scan rows of one riven family, oldest first. Blocking: call from a blocking task.
+pub(crate) fn rows_for(wfm_url: &str) -> Vec<RivenPrice> {
+    let mut rows: Vec<RivenPrice> = load_store().rows.into_iter().filter(|r| r.wfm_url == wfm_url).collect();
+    rows.sort_by(|a, b| a.datetime.cmp(&b.datetime));
+    rows
+}
+
 /// Summary statistics over a list of buyout prices.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PriceStats {

@@ -63,13 +63,13 @@ function Outcome({ error, done }: { error: string | null; done: string | null })
   );
 }
 
-function Gone({ what, onClose }: { what: string; onClose: () => void }) {
+function Gone({ what, onClose, closeLabel = "Close (Esc)" }: { what: string; onClose: () => void; closeLabel?: string }) {
   return (
     <Card className="vt-station-card" p="md" data-station-card="gone">
       <Text size="sm">{what}</Text>
       <Group justify="flex-end" mt="md">
         <Button variant="default" size="xs" onClick={onClose}>
-          Close (Esc)
+          {closeLabel}
         </Button>
       </Group>
     </Card>
@@ -106,16 +106,18 @@ interface CardProps {
   /** Open the full Live Trading page (bulk edit, market info, trade messages). */
   onMore: () => void;
   onClose: () => void;
+  /** Label of the close button. The station closes cards with Esc; the game uses Esc to disengage a screen, so it passes "Close". */
+  closeLabel?: string;
 }
 
-function CardFooter({ onMore, onClose, more }: { onMore: () => void; onClose: () => void; more: string }) {
+function CardFooter({ onMore, onClose, more, closeLabel = "Close (Esc)" }: { onMore: () => void; onClose: () => void; more: string; closeLabel?: string }) {
   return (
     <Group justify="space-between" mt="xs" wrap="nowrap">
       <Button variant="subtle" size="compact-xs" onClick={onMore} data-station-more>
         {more}
       </Button>
       <Button variant="default" size="xs" onClick={onClose}>
-        Close (Esc)
+        {closeLabel}
       </Button>
     </Group>
   );
@@ -125,7 +127,7 @@ function CardFooter({ onMore, onClose, more }: { onMore: () => void; onClose: ()
 // Stock item (a sell order on the shelves)
 // ---------------------------------------------------------------------------
 
-export function StockCard({ item, demo, onChanged, onMore, onClose }: CardProps & { item: StockItem | null }) {
+export function StockCard({ item, demo, onChanged, onMore, onClose, closeLabel }: CardProps & { item: StockItem | null }) {
   const [mode, setMode] = useState("sell");
   const [qty, setQty] = useState<string | number>(1);
   const [price, setPrice] = useState<string | number>(item?.list_price ?? 0);
@@ -134,7 +136,7 @@ export function StockCard({ item, demo, onChanged, onMore, onClose }: CardProps 
   const [minPrice, setMinPrice] = useState<string | number>(item?.properties?.min_price ?? "");
   const { busy, error, done, run } = useAction(onChanged);
 
-  if (!item) return <Gone what={done ?? "This item is no longer in stock."} onClose={onClose} />;
+  if (!item) return <Gone what={done ?? "This item is no longer in stock."} onClose={onClose} closeLabel={closeLabel} />;
   const sub = subTypeText(item.sub_type);
   const count = Math.max(1, Math.min(item.owned, Math.floor(num(qty, 1)) || 1));
   const sellPrice = Math.max(0, Math.floor(num(price)));
@@ -241,7 +243,7 @@ export function StockCard({ item, demo, onChanged, onMore, onClose }: CardProps 
           </>
         )}
         <Outcome error={error} done={done} />
-        <CardFooter onMore={onMore} onClose={onClose} more="Market info, bulk edit: stock desk" />
+        <CardFooter onMore={onMore} onClose={onClose} more="Market info, bulk edit: stock desk" closeLabel={closeLabel} />
       </Stack>
     </Card>
   );
@@ -251,14 +253,14 @@ export function StockCard({ item, demo, onChanged, onMore, onClose }: CardProps 
 // Stock riven (display case)
 // ---------------------------------------------------------------------------
 
-export function RivenCard({ riven, demo, onChanged, onMore, onClose }: CardProps & { riven: StockRiven | null }) {
+export function RivenCard({ riven, demo, onChanged, onMore, onClose, closeLabel }: CardProps & { riven: StockRiven | null }) {
   const [mode, setMode] = useState("sell");
   const [price, setPrice] = useState<string | number>(riven?.list_price ?? 0);
   const [bought, setBought] = useState<string | number>(riven?.bought ?? 0);
   const [minPrice, setMinPrice] = useState<string | number>(riven?.properties?.min_price ?? "");
   const { busy, error, done, run } = useAction(onChanged);
 
-  if (!riven) return <Gone what={done ?? "This riven is no longer in stock."} onClose={onClose} />;
+  if (!riven) return <Gone what={done ?? "This riven is no longer in stock."} onClose={onClose} closeLabel={closeLabel} />;
   const sellPrice = Math.max(0, Math.floor(num(price)));
   const name = rivenName(riven);
 
@@ -351,7 +353,7 @@ export function RivenCard({ riven, demo, onChanged, onMore, onClose }: CardProps
           </>
         )}
         <Outcome error={error} done={done} />
-        <CardFooter onMore={onMore} onClose={onClose} more="Match filter, grades, market info: stock desk" />
+        <CardFooter onMore={onMore} onClose={onClose} more="Match filter, grades, market info: stock desk" closeLabel={closeLabel} />
       </Stack>
     </Card>
   );
@@ -361,7 +363,7 @@ export function RivenCard({ riven, demo, onChanged, onMore, onClose }: CardProps
 // Wish list entry (wanted poster)
 // ---------------------------------------------------------------------------
 
-export function WishCard({ wish, demo, onChanged, onMore, onClose }: CardProps & { wish: WishItem | null }) {
+export function WishCard({ wish, demo, onChanged, onMore, onClose, closeLabel }: CardProps & { wish: WishItem | null }) {
   const [mode, setMode] = useState("buy");
   const [qty, setQty] = useState<string | number>(1);
   const [price, setPrice] = useState<string | number>(wish?.list_price ?? 0);
@@ -369,7 +371,7 @@ export function WishCard({ wish, demo, onChanged, onMore, onClose }: CardProps &
   const [maxPrice, setMaxPrice] = useState<string | number>(wish?.properties?.max_price ?? "");
   const { busy, error, done, run } = useAction(onChanged);
 
-  if (!wish) return <Gone what={done ?? "This entry is no longer on the wish list."} onClose={onClose} />;
+  if (!wish) return <Gone what={done ?? "This entry is no longer on the wish list."} onClose={onClose} closeLabel={closeLabel} />;
   const sub = subTypeText(wish.sub_type);
   const count = Math.max(1, Math.min(wish.quantity, Math.floor(num(qty, 1)) || 1));
   const paid = Math.max(0, Math.floor(num(price)));
@@ -458,7 +460,7 @@ export function WishCard({ wish, demo, onChanged, onMore, onClose }: CardProps &
           </>
         )}
         <Outcome error={error} done={done} />
-        <CardFooter onMore={onMore} onClose={onClose} more="Add entries, WTB message: stock desk" />
+        <CardFooter onMore={onMore} onClose={onClose} more="Add entries, WTB message: stock desk" closeLabel={closeLabel} />
       </Stack>
     </Card>
   );

@@ -2,14 +2,15 @@ import { AddMetric } from "@api/index";
 import { Header } from "@components/Layouts/Shared/Header";
 import { NavbarLinkProps, NavbarMinimalColored } from "@components/Layouts/Shared/NavbarMinimalColored";
 import { useAuthContext } from "@contexts/auth.context";
-import { faBoxes, faBug, faEnvelope, faGamepad, faGlobe, faHome, faInfoCircle, faMessage } from "@fortawesome/free-solid-svg-icons";
+import { faBoxes, faBug, faEnvelope, faGamepad,
+  faStar, faGlobe, faHome, faInfoCircle, faMessage } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useTranslateComponent } from "@hooks/useTranslate.hook";
 import { faWarframeMarket, facTradingAnalytics } from "@icons";
 import { AppShell, Box, Indicator } from "@mantine/core";
 import { open } from "@tauri-apps/plugin-shell";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { prefetchRoute } from "../routeLoaders";
 import classes from "./LogInLayout.module.css";
 
@@ -26,6 +27,7 @@ export function LogInLayout() {
 
   // States
   const navigate = useNavigate();
+  const section = useLocation().pathname.split("/")[1] ?? "";
   const handleNavigate = useCallback(
     (link: NavbarLinkProps) => {
       if (link.web) open(link.link, "_blank");
@@ -42,6 +44,14 @@ export function LogInLayout() {
 
   const links = useMemo(
     () => [
+      {
+        align: "top",
+        id: "game",
+        link: "game",
+        icon: <FontAwesomeIcon size={"lg"} icon={faStar} />,
+        label: "Void (3D preview)",
+        onClick: (e: NavbarLinkProps) => handleNavigate(e),
+      },
       {
         align: "top",
         id: "station",
@@ -181,7 +191,12 @@ export function LogInLayout() {
 
       <AppShell.Main>
         <Box>
-          <Outlet />
+          {/* One boundary per route: a navigation to a lazy page that is still loading unmounts the
+              page being left (the full-window game must not stay on screen) and shows the fallback,
+              instead of React keeping the old tree for the whole transition. */}
+          <Suspense key={section} fallback={null}>
+            <Outlet />
+          </Suspense>
         </Box>
       </AppShell.Main>
     </AppShell>

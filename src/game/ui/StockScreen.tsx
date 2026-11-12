@@ -57,7 +57,7 @@ export function StockScreen({ shop, docked, onChanged, onMore, onDisengage }: { 
       </div>
       <div style={{ flex: 1, minWidth: 0, padding: "14px 18px", overflowY: "auto" }} className="vtg-list">
         {item ? (
-          <StockCard key={item.id} item={item} demo={!!shop?.demo} onChanged={onChanged} onMore={onMore} onClose={() => setPicked(null)} />
+          <StockCard key={item.id} item={item} demo={!!shop?.demo} onChanged={onChanged} onMore={onMore} onClose={() => setPicked(null)} closeLabel="Close" />
         ) : picked !== null ? (
           <div className="vtg-dim" style={{ fontSize: 18 }}>
             That item is no longer in stock.

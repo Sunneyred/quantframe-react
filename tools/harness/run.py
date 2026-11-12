@@ -1831,6 +1831,118 @@ def scenario_dist(s: Suite) -> None:
         no_error_boundary(s, "dist events")
 
 
+def V(pg, expr: str):
+    """Evaluate against the 3D game's dev handle (window.__vtGame, src/game/GameCore.tsx)."""
+    return pg.evaluate("() => { const g = window.__vtGame; if (!g) return null; return %s; }" % expr)
+
+
+def game_steps(pg, n: int = 10) -> None:
+    """Advance the game deterministically (the engine is stopped; software WebGL is slow) and render once."""
+    pg.evaluate("(n) => { const e = window.__vtGame.engine; for (let i = 0; i < n; i++) e.step(0.05, false); e.step(0.016); }", n)
+
+
+def scenario_game(s: Suite) -> None:
+    """The 3D game on the real app with the mock: walk from the Vault to the Market Observatory,
+    focus a star, raise its order book on the spire, see an undercut, dock the Market Console, use
+    search and filters, route an app modal onto the Comms display, and leave the route cleanly."""
+    with s.step("game: boots on /game with the market overview"):
+        pg = s.open(1280, 800, storage={"vt_station_start": "0", "vt_game_quality": "low", "vt_game_view": "first"})
+        wait_app(s)
+        # software WebGL plus the 3D-transformed DOM layer make every composited frame slow here:
+        # in-world controls are clicked with dispatched events, and waits are generous
+        pg.set_default_timeout(60000)
+        # the app lands on Home after boot; open the game route through the router
+        pg.evaluate("() => { history.pushState({}, '', '/game'); dispatchEvent(new PopStateEvent('popstate')); }")
+        pg.wait_for_function("() => window.__vtGame && window.__vtGame.market.state.market", timeout=60000)
+        pg.evaluate("() => window.__vtGame.engine.stop()")
+        n = V(pg, "g.market.state.market.overview.items.length")
+        s.check(n and n > 1200, f"only {n} stars in the overview")
+        s.check(len(calls(pg, "vt_market_overview")) >= 1, "vt_market_overview never called")
+        s.check(V(pg, "g.where") == "vault", "did not start in the vault")
+        game_steps(pg, 5)
+    with s.step("game: walks north through the arch and the corridor into the observatory"):
+        pg.evaluate("() => { const g = window.__vtGame; g.place(0.2, -8, 0); g.engine.player.pitch = 0; g.engine.input.keys.add('KeyW'); }")
+        for _ in range(8):
+            game_steps(pg, 20)
+            if V(pg, "g.where") == "observatory" and V(pg, "g.engine.player.pos.z") < -24:
+                break
+        pg.evaluate("() => window.__vtGame.engine.input.keys.clear()")
+        game_steps(pg, 4)
+        s.check(V(pg, "g.where") == "observatory", f"player ended in {V(pg, 'g.where')} at z={V(pg, 'g.engine.player.pos.z')}")
+    url = "nova_prime_set"
+    with s.step("game: looks at a star and presses E to focus it"):
+        pos = V(pg, f"g.observatory.orrery.starWorld('{url}')")
+        s.check(pos is not None, "star not in the sky")
+        pg.evaluate("""(p) => { const g = window.__vtGame; const cz = g.observatory.root.position.z; const dx = p.x, dz = p.z - cz; const d = Math.hypot(dx, dz) || 1;
+            g.place(dx / d * (d + 2.4), cz + dz / d * (d + 2.4), 0); g.aimAt(p.x, p.y, p.z); }""", pos)
+        game_steps(pg, 3)
+        s.check(V(pg, "g.market.hovered") == url, f"reticle hovers {V(pg, 'g.market.hovered')}")
+        pg.keyboard.press("KeyE")
+        pg.wait_for_function("(u) => { const f = window.__vtGame.market.state.focus; return f && f.wfm_url === u && window.__vtGame.market.state.book; }", arg=url, timeout=15000)
+        s.check(len(calls(pg, "vt_order_book")) >= 1, "vt_order_book never called")
+        pg.wait_for_function("() => window.__vtGame.market.state.history", timeout=15000)
+        s.check(V(pg, "g.market.state.history.points.length") > 10, "no price history on the ribbon")
+    with s.step("game: the spire rises with the order book and the ribbon"):
+        vp = V(pg, "g.observatory.viewpoint")
+        pg.evaluate("(v) => { const g = window.__vtGame; g.place(v.x, v.z, 0); g.engine.player.pitch = 0.1; }", vp)
+        game_steps(pg, 50)
+        b = V(pg, "g.market.state.book.summary")
+        s.check(b["own_sell"] is not None and b["undercut_by"] is None, f"own order should lead: {b}")
+    with s.step("game: an undercut dims your slab and slides a red one in below it"):
+        s.check(H(pg, f"h.marketUndercut('{url}', 3)") is True, "no own order to undercut")
+        before = len(calls(pg, "vt_order_book"))
+        pg.evaluate("() => window.__vtGame.market.refresh()")
+        pg.wait_for_function("() => { const b = window.__vtGame.market.state.book; return b && b.summary.undercut_by; }", timeout=15000)
+        s.check(len(calls(pg, "vt_order_book")) > before, "refresh did not read the book again")
+        s.check(V(pg, "g.market.state.book.summary.undercut_by") == 3, "undercut amount")
+        game_steps(pg, 8)
+        s.check(V(pg, "g.market.undercutActive") is True, "spire shows no undercut animation")
+    with s.step("game: docks the Market Console beside the spire"):
+        pg.evaluate("() => window.__vtGame.engine.screens.dock('market')")
+        game_steps(pg, 30)
+        s.check(V(pg, "g.engine.screens.docked && g.engine.screens.docked.id") == "market", "console not docked")
+        s.check("Nova Prime Set" in pg.locator("[data-vtg-market-focus]").inner_text(), "console shows another item")
+        s.check(pg.locator("[data-vtg-market-own]").count() == 1 and "undercut" in pg.locator("[data-vtg-market-own]").inner_text(), "own order line missing")
+    with s.step("game: search flies the focus, filters dim the sky"):
+        pg.fill("[data-vtg-market-search]", "Glaive Prime Set")
+        pg.locator("[data-vtg-market-item='Glaive Prime Set']").first.dispatch_event("click")
+        pg.wait_for_function("() => window.__vtGame.market.state.focus.wfm_url === 'glaive_prime_set'", timeout=8000)
+        pg.locator("[data-vtg-filter='mine']").dispatch_event("click")
+        pg.wait_for_function("() => window.__vtGame.market.state.filter.mine === true", timeout=5000)
+        game_steps(pg, 4)
+        s.check(V(pg, "g.observatory.orrery.count") > 1200, "sky emptied by the filter")
+        pg.locator("[data-vtg-filter='mine']").dispatch_event("click")
+    with s.step("game: stock actions of the focused item (the station's own card)"):
+        pg.locator("[data-vtg-market-open-stock]").dispatch_event("click")
+        pg.wait_for_selector("[data-vtg-market-detail] button:has-text('Close')", state="attached", timeout=10000)
+        s.check(pg.locator("[data-vtg-market-detail] button:has-text('Close (Esc)')").count() == 0, "card still says Close (Esc) in the game")
+        pg.locator("[data-vtg-market-detail] button:has-text('Close')").last.dispatch_event("click")
+        pg.evaluate("() => window.__vtGame.engine.screens.undock()")
+        game_steps(pg, 30)
+    with s.step("game: an app modal is shown on the Comms display, not in screen space"):
+        pg.evaluate("() => window.__vtGame.openTestModal()")
+        # Mantine's open transition needs a few composited frames, which are slow under software GL
+        pg.wait_for_selector(".mantine-Modal-content", state="attached", timeout=30000)
+        game_steps(pg, 30)
+        s.check(V(pg, "g.modals.isOpen") is True, "router did not take the modal")
+        s.check(pg.evaluate("() => !!document.querySelector('[data-screen=comms] .mantine-Modal-content')"), "modal not inside the comms screen")
+        s.check(V(pg, "g.engine.screens.docked && g.engine.screens.docked.id") == "comms", "comms not docked")
+        pg.locator(".mantine-Modal-content button:has-text('Cancel')").dispatch_event("click")
+        pg.wait_for_selector(".mantine-Modal-content", state="detached", timeout=10000)
+        game_steps(pg, 30)
+        s.check(V(pg, "g.modals.isOpen") is False and not V(pg, "g.engine.screens.busy"), "comms did not close")
+        s.check(pg.evaluate("() => document.querySelector('[data-mantine-shared-portal-node]').parentElement === document.body"), "portal node not back in <body>")
+    with s.step("game: third person in the observatory"):
+        pg.evaluate("() => window.__vtGame.engine.setView('third')")
+        game_steps(pg, 30)
+        pg.evaluate("() => window.__vtGame.engine.setView('first')")
+    with s.step("game: leaving for a lazy route unmounts the game at once"):
+        pg.evaluate("() => { history.pushState({}, '', '/trading_analytics'); dispatchEvent(new PopStateEvent('popstate')); }")
+        pg.wait_for_selector("[data-vtg-host]", state="detached", timeout=10000)
+        s.check(pg.evaluate("() => !document.querySelector('.vtg-root') && !window.__vtGame"), "game DOM or handle left behind")
+        s.check(pg.evaluate("() => { const n = document.querySelector('[data-mantine-shared-portal-node]'); return !n || document.body.contains(n); }"), "portal node lost")
+
+
 SCENARIOS = {
     "boot": lambda s: scenario_boot(s),
     "classic": lambda s: scenario_classic(s),
@@ -1841,6 +1953,7 @@ SCENARIOS = {
     "safety": lambda s: scenario_safety(s),
     "layout": lambda s: scenario_layout(s, DEFAULT_WINDOW[0], DEFAULT_WINDOW[1]),
     "small": lambda s: scenario_layout(s, 1280, 800, classic=False, alerts=False),
+    "game": lambda s: scenario_game(s),
 }
 
 

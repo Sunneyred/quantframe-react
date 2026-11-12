@@ -97,14 +97,14 @@ export function PAScreen({ items }: { items: Announcement[] }) {
   );
 }
 
-/** The plaque over the sealed door to the next sector. */
+/** The plaque over the arch to the Market Observatory. */
 export function SignScreen() {
   return (
     <div className="vtg-sign">
       <div style={{ height: 22, width: "80%", backgroundImage: `url(${glyphStripURL(34, GOLD, 22, 3)})`, backgroundRepeat: "repeat-x", backgroundSize: "auto 22px", opacity: 0.7 }} />
       <div style={{ fontFamily: "Orbitron, sans-serif", fontWeight: 600, fontSize: 54, letterSpacing: "0.2em", color: GOLD, textShadow: "0 0 16px rgba(232,193,90,0.6)", marginTop: 8 }}>SECTOR II</div>
       <div style={{ fontSize: 30, letterSpacing: "0.3em", color: "#9fefff", marginTop: 2 }} className="vtg-pulse">
-        MARKET OBSERVATORY · SEALED
+        MARKET OBSERVATORY · THIS WAY
       </div>
     </div>
   );

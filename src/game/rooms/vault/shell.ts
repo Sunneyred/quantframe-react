@@ -16,11 +16,11 @@ export const DOME_H = 7.6;
 export const OCULUS = 2.4;
 export const SEG_W = 2 * R * Math.sin(Math.PI / 12);
 
-export type SegmentKind = "wall" | "window" | "door-sealed" | "door-open";
+export type SegmentKind = "wall" | "window" | "door-sealed" | "door-open" | "door-arch";
 
 /** What stands in each of the twelve wall segments, by angle (degrees clockwise from north). */
 export const SEGMENTS: Record<number, SegmentKind> = {
-  0: "door-sealed",
+  0: "door-arch", // to the Market Observatory (rooms/observatory)
   30: "window",
   60: "door-open",
   90: "wall",

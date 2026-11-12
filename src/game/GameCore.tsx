@@ -1,4 +1,5 @@
 import { MantineThemeProvider } from "@mantine/core";
+import { modals } from "@mantine/modals";
 import { notifications } from "@mantine/notifications";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -9,11 +10,20 @@ import { fontsReady } from "./art/textures";
 import { Engine, type EngineStats } from "./core/Engine";
 import type { ViewMode } from "./core/player";
 import type { Quality } from "./core/quality";
+import * as THREE from "three";
+import type { MarketStar } from "@api/market";
+import { demoUndercut } from "./market/demo";
+import { ModalRouter } from "./modalRouter";
 import { makeAnnouncement, useNotificationCapture, type Announcement } from "./notify";
+import { ObservatoryRoom } from "./rooms/observatory";
+import { Ship } from "./rooms/ship";
 import { VaultRoom } from "./rooms/vault";
 import { ConsoleScreen, PAScreen, ReservoirScreen, SignScreen } from "./ui/Ambient";
 import { DeskScreen } from "./ui/DeskScreen";
+import { MarketConsole } from "./ui/MarketConsole";
 import { StockScreen } from "./ui/StockScreen";
+import { useMarket } from "./ui/useMarket";
+import { WeatherScreen } from "./ui/WeatherScreen";
 import "./game.css";
 
 /**
@@ -30,7 +40,12 @@ const QUEUE_CAPACITY = 6;
 interface Live {
   engine: Engine;
   vault: VaultRoom;
+  observatory: ObservatoryRoom;
+  ship: Ship;
+  modals: ModalRouter;
 }
+
+const COMMS = "comms";
 
 export default function GameCore() {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -77,7 +92,13 @@ export default function GameCore() {
       },
       onToggleQuality: () => engine.setQuality(engine.quality === "high" ? "low" : "high"),
     });
-    engine.setRoom(vault);
+    const observatory = new ObservatoryRoom(engine, { onFocus: (star) => focusRef.current(star) });
+    const ship = new Ship(engine, vault, observatory);
+    engine.setRoom(ship);
+    // the Comms display: app modals are routed onto it (see modalRouter.ts); parked and hidden until then
+    engine.screens.add({ id: COMMS, title: "Comms", px: [980, 700], width: 1.45, position: new THREE.Vector3(0, -50, 0), yaw: 0, dockable: true, reach: 0, fill: 0.86 });
+    engine.screens.setHidden(COMMS, true);
+    const modals = new ModalRouter(engine, COMMS);
     const offs = [
       engine.events.on("dock", (id) => {
         setDocked(id);
@@ -105,7 +126,7 @@ export default function GameCore() {
     ];
     setQualityState(engine.quality);
     setViewState(engine.player.view);
-    const l = { engine, vault };
+    const l: Live = { engine, vault, observatory, ship, modals };
     liveRef.current = l;
     setLive(l);
     if (goalRef.current) vault.setGoal(goalRef.current);
@@ -116,14 +137,15 @@ export default function GameCore() {
       setAnnouncements((a) => [...a]);
     });
     engine.start();
-    if (import.meta.env.DEV) (window as unknown as { __vtGame?: Live }).__vtGame = l;
+    if (import.meta.env.DEV) (window as unknown as { __vtGame?: unknown }).__vtGame = devHandle(l, () => marketRef.current);
     return () => {
       for (const off of offs) off();
+      modals.dispose(); // puts Mantine's shared portal node back in <body> before the DOM goes
       engine.dispose(); // also releases pointer lock and removes the canvas and the CSS3D layer
       if (liveRef.current === l) liveRef.current = null;
       setLive(null);
       setDocked(null);
-      if (import.meta.env.DEV) delete (window as unknown as { __vtGame?: Live }).__vtGame;
+      if (import.meta.env.DEV) delete (window as unknown as { __vtGame?: unknown }).__vtGame;
     };
   }, [announce]);
 
@@ -221,6 +243,39 @@ export default function GameCore() {
     };
   }, [announce, loadShop]);
 
+  // --- the Market Observatory
+  const mk = useMarket(live?.observatory ?? null, shop, announce);
+  const focusRef = useRef<(s: MarketStar) => void>(() => {});
+  focusRef.current = mk.setFocus;
+  const marketRef = useRef(mk);
+  marketRef.current = mk;
+  const marketChanged = useCallback(() => {
+    void loadShop();
+    reloadRef.current();
+    void mk.reloadMarket();
+  }, [loadShop, mk.reloadMarket]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pickFromWeather = useCallback((s: MarketStar) => {
+    mk.setFocus(s);
+    liveRef.current?.engine.screens.undock();
+  }, [mk.setFocus]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- leaving the route: hide and stop at once, even while React still holds the old tree
+  // (a navigation to a lazy route keeps the previous screen until the chunk loads)
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const start = window.location.pathname;
+    const id = window.setInterval(() => {
+      const away = window.location.pathname !== start;
+      host.style.visibility = away ? "hidden" : "";
+      const e = liveRef.current?.engine;
+      if (!e) return;
+      if (away) e.stop();
+      else if (!document.hidden) e.start();
+    }, 150);
+    return () => window.clearInterval(id);
+  }, []);
+
   // --- the ticker ring
   useEffect(() => {
     if (!live) return;
@@ -230,8 +285,10 @@ export default function GameCore() {
       lines.push(`Today +${Math.round(goal.profit_today).toLocaleString()}p of ${Math.round(goal.daily_target).toLocaleString()}p`);
     }
     lines.push(queue.length ? `${queue.length} at the trade desk` : "The trade desk is open");
+    const items = mk.state.market?.overview.items;
+    if (items?.length) lines.push(`Market Observatory north: ${items.filter((i) => i.trend_dir === "rising").length} rising, ${items.filter((i) => i.trend_dir === "falling").length} falling`);
     live.vault.setTicker(lines);
-  }, [live, announcements, goal, queue.length]);
+  }, [live, announcements, goal, queue.length, mk.state.market]);
 
   // a first line on the PA display
   useEffect(() => {
@@ -239,7 +296,7 @@ export default function GameCore() {
   }, [announce]);
 
   const undock = useCallback(() => liveRef.current?.engine.screens.undock(), []);
-  const onMore = useCallback(() => announce(makeAnnouncement("Stock desk", "Bulk edit and market info open in a later sector of the ship.", "cyan")), [announce]);
+  const onMore = useCallback(() => announce(makeAnnouncement("Stock desk", "Market info: the Market Observatory, north through the arch. Bulk edit: Live Trading in the app.", "cyan")), [announce]);
 
   const portals = useMemo(() => {
     if (!live) return null;
@@ -259,6 +316,29 @@ export default function GameCore() {
         "console",
         <ConsoleScreen quality={quality} view={view} stats={stats} docked={docked === "console"} onQuality={(q) => live.engine.setQuality(q)} onView={(v) => live.engine.setView(v)} onDisengage={undock} />,
       ],
+      [
+        live.observatory.screens.market.content,
+        "market",
+        <MarketConsole
+          market={mk.state.market}
+          shop={shop}
+          focus={mk.state.focus}
+          book={mk.state.book}
+          bookLoading={mk.state.bookLoading}
+          bookError={mk.state.bookError}
+          history={mk.state.history}
+          filter={mk.state.filter}
+          docked={docked === "market"}
+          onFilter={mk.setFilter}
+          onFocus={mk.setFocus}
+          onRefresh={mk.refreshBook}
+          onVariant={mk.setVariant}
+          onChanged={marketChanged}
+          onMore={onMore}
+          onDisengage={undock}
+        />,
+      ],
+      [live.observatory.screens.weather.content, "weather", <WeatherScreen market={mk.state.market} docked={docked === "weather"} onPick={pickFromWeather} onDisengage={undock} />],
     ];
     return out.map(([el, id, node]) =>
       createPortal(
@@ -268,11 +348,58 @@ export default function GameCore() {
         id,
       ),
     );
-  }, [live, goal, demo, docked, queue, selected, shop, announcements, quality, view, stats, dismiss, stockChanged, undock, onMore]);
+  }, [live, goal, demo, docked, queue, selected, shop, announcements, quality, view, stats, dismiss, stockChanged, undock, onMore, mk.state, mk.setFilter, mk.setFocus, mk.refreshBook, mk.setVariant, marketChanged, pickFromWeather]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div ref={hostRef} className="vtg-host" data-vtg-host>
       {portals}
     </div>
   );
+}
+
+/**
+ * Dev-only handle for tests and the console (`window.__vtGame`): the engine and rooms, plus
+ * helpers to move the player, aim at things and drive the observatory.
+ */
+function devHandle(l: Live, market: () => ReturnType<typeof useMarket>) {
+  const { engine, ship, observatory } = l;
+  const aimAt = (target: THREE.Vector3) => {
+    const eye = engine.player.eye(new THREE.Vector3());
+    const d = target.clone().sub(eye);
+    engine.player.yaw = Math.atan2(-d.x, -d.z);
+    engine.player.pitch = Math.atan2(d.y, Math.hypot(d.x, d.z));
+  };
+  return {
+    ...l,
+    get where() {
+      return ship.where;
+    },
+    place: (x: number, z: number, yaw = 0) => engine.player.place(x, z, yaw),
+    aimAt: (x: number, y: number, z: number) => aimAt(new THREE.Vector3(x, y, z)),
+    /** Aim the reticle at a star (the player must be within reach). */
+    aimAtStar: (url: string) => {
+      const p = observatory.orrery.starWorld(url);
+      if (p) aimAt(p);
+      return p ? [p.x, p.y, p.z] : null;
+    },
+    /** Open a modal through the app's ModalsProvider, as app code does (tests the routing onto Comms). */
+    openTestModal: () =>
+      modals.openConfirmModal({ title: "A modal from the app", children: "Opened by the app outside the game tree, shown on the Comms display.", labels: { confirm: "Confirm", cancel: "Cancel" } }),
+    market: {
+      get state() {
+        return market().state;
+      },
+      focus: (url: string) => market().focusUrl(url)?.wfm_url ?? null,
+      refresh: () => market().refreshBook(),
+      /** Demo data only: the next refresh brings an in-game seller under your order. */
+      undercut: (url: string) => demoUndercut(url),
+      get hovered() {
+        const i = observatory.orrery.hovered;
+        return i >= 0 ? (market().state.market?.overview.items[i]?.wfm_url ?? null) : null;
+      },
+      get undercutActive() {
+        return observatory.spire.undercutActive;
+      },
+    },
+  };
 }

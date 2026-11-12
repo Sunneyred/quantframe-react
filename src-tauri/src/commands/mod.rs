@@ -33,6 +33,7 @@ pub mod transaction;
 pub mod warframe_gdpr;
 pub mod wf_inventory;
 pub mod wish_list;
+pub mod void_market;
 pub mod void_riven_market;
 pub mod void_sell_finder;
 pub mod void_strategy;

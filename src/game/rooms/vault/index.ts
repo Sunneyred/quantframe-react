@@ -11,7 +11,8 @@ import { APOTHEM, buildShell, type Shell } from "./shell";
 
 /**
  * Room 1, the Vault. Builds the hall, the Plat Reservoir, the Trade Desk with its customers, the
- * Stock Display, the fidelity console, the PA display and the sealed door, and registers their
+ * Stock Display, the fidelity console, the PA display and the open arch north to the Market
+ * Observatory, and registers their
  * screens and interactables. React feeds it data through the setters below.
  */
 
@@ -53,7 +54,7 @@ export class VaultRoom implements Room {
     this.shell.tickerTexture(tex);
     this.labels.push(this.tickerLabel, this.queueLabel);
 
-    world.bound = APOTHEM - 0.75;
+    world.area({ kind: "circle", x: 0, z: 0, r: APOTHEM - 0.75 });
 
     // --- Plat Reservoir, centre of the hall
     this.reservoir = new Reservoir(p, () => engine.quality === "low");
@@ -133,19 +134,9 @@ export class VaultRoom implements Room {
     // --- fidelity console, south west
     const consoleScreen = this.buildConsole(hooks);
 
-    // --- PA display over the line of customers, and the sign over the sealed door
+    // --- PA display over the line of customers, and the sign over the arch to the observatory
     const pa = screens.add({ id: "pa", title: "Vault Announcements", px: [1100, 320], width: 3.4, position: polar(120, APOTHEM - 0.12, 3.55), yaw: faceCentre(120) });
-    const sign = screens.add({ id: "sign", title: "Sector II", px: [900, 220], width: 2.2, position: polar(0, APOTHEM - 0.16, 5.16), yaw: faceCentre(0) });
-    interact.add({
-      id: "sealed-door",
-      label: "Sector II: sealed",
-      verb: "Locked",
-      position: polar(0, APOTHEM, 2.1),
-      radius: 1.4,
-      reach: 4,
-      enabled: () => !screens.busy,
-      onUse: () => undefined,
-    });
+    const sign = screens.add({ id: "sign", title: "Market Observatory", px: [900, 220], width: 2.2, position: polar(0, APOTHEM - 0.16, 5.16), yaw: faceCentre(0) });
     this.plaque("ARRIVALS", "TRADERS ENTER HERE", polar(DOOR_DEG, APOTHEM - 0.14, 5.2), faceCentre(DOOR_DEG));
     this.banners();
     this.sculptures();

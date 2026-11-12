@@ -64,6 +64,7 @@ answered with a 1x1 PNG) and counted.
 | `safety` | a page crashing inside a panel is contained; a crash of the station itself shows the way out, turns "open in the station" off and the app then opens in the classic view |
 | `layout` | the classic routes and every station panel, card and overlay at the app's default window size (read from `src-tauri/tauri.conf.json`) |
 | `small` | every station panel, card and overlay at 1280x800, with no alert showing (pages use different offsets then) |
+| `game` | the 3D game (`/game`): walk from the Vault into the Market Observatory, focus a star with E, order book on the spire, an undercut, the Market Console (search, filters, stock card), an app modal routed onto the Comms display, third person, leaving for a lazy route |
 | `dist` | builds the production bundle (`pnpm build`) and runs a smoke pass on it: boot, routes, rooms, every terminal, lever, a sale, events (`--skip-build` uses the existing `dist/`) |
 
 All but `dist` run on the Vite dev server, where the station exposes its game object

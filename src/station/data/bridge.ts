@@ -63,7 +63,7 @@ type ApiModule = typeof import("@api/index");
 let apiModule: Promise<ApiModule | null> | null = null;
 
 /** The app's Tauri client, or null outside Tauri. Never throws. */
-function loadApi(): Promise<ApiModule | null> {
+export function loadApi(): Promise<ApiModule | null> {
   if (!isTauri()) return Promise.resolve(null);
   apiModule ??= import("@api/index").catch((e) => {
     console.warn("[station] api unavailable", e);
@@ -410,6 +410,72 @@ export async function fetchShop(): Promise<ShopData> {
   ]);
   if (errors.length > 0) out.error = errors[0];
   return out;
+}
+
+/**
+ * Put an item in stock by its warframe.market url, exactly like "Add" on Live Trading > Items
+ * (`stock_item_create`). `bought` is the price paid for each copy (0 for something you own).
+ */
+export async function addStockItem(wfmUrl: string, name: string, quantity: number, bought: number, subType?: TauriTypes.SubType): Promise<void> {
+  const qty = Math.max(1, Math.floor(quantity) || 1);
+  const paid = Math.max(0, Math.floor(bought) || 0);
+  const mod = await loadApi();
+  if (!mod) {
+    requireDemo();
+    await demoDelay();
+    const it = demoItems.find((i) => i.wfm_url === wfmUrl);
+    if (it) {
+      it.bought = Math.round((it.bought * it.owned + paid * qty) / (it.owned + qty));
+      it.owned += qty;
+      return;
+    }
+    demoItems.push({
+      id: demoId++,
+      item_name: name,
+      item_unique_name: `/Demo/${wfmUrl}`,
+      wfm_id: wfmUrl,
+      wfm_url: wfmUrl,
+      owned: qty,
+      bought: paid,
+      status: "pending" as TauriTypes.StockStatus,
+      is_hidden: false,
+      created_at: now(),
+      updated_at: now(),
+      price_history: [],
+      properties: {},
+      ...(subType ? { sub_type: subType } : {}),
+    } as StockItem);
+    return;
+  }
+  await mod.default.stock_item.create({ raw: wfmUrl, quantity: qty, bought: paid, sub_type: subType });
+}
+
+/** Add an entry to the wish list, like "Add" on Live Trading > Wish list (`wish_list_create`). */
+export async function addWish(wfmUrl: string, name: string, quantity: number, maxPrice?: number, subType?: TauriTypes.SubType): Promise<void> {
+  const qty = Math.max(1, Math.floor(quantity) || 1);
+  const max = maxPrice && maxPrice > 0 ? Math.floor(maxPrice) : undefined;
+  const mod = await loadApi();
+  if (!mod) {
+    requireDemo();
+    await demoDelay();
+    if (demoWishes.some((w) => w.wfm_url === wfmUrl)) throw new Error("Demo: that item is already on the wish list.");
+    demoWishes.push({
+      id: demoId++,
+      item_name: name,
+      wfm_url: wfmUrl,
+      quantity: qty,
+      bought: 0,
+      status: "pending" as TauriTypes.StockStatus,
+      is_hidden: false,
+      created_at: now(),
+      updated_at: now(),
+      price_history: [],
+      properties: max ? { max_price: max } : {},
+      ...(subType ? { sub_type: subType } : {}),
+    } as WishItem);
+    return;
+  }
+  await mod.default.wish_list.create({ raw: wfmUrl, quantity: qty, maximum_price: max, sub_type: subType });
 }
 
 /** "Sell" on a stock row: records the sale and takes the copies out of stock. Throws with the backend's reason. */

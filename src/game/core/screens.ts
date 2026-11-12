@@ -65,9 +65,26 @@ export interface Screen {
 /** The CSS3D scene is kept in centimetres (world metres x CSS_SCALE), so element matrices stay in pixel-like ranges. */
 export const CSS_SCALE = 100;
 
-type DockState = { screen: Screen; target: number; blend: number; pos: THREE.Vector3; quat: THREE.Quaternion };
+type DockState = {
+  screen: Screen;
+  target: number;
+  blend: number;
+  pos: THREE.Vector3;
+  quat: THREE.Quaternion;
+  /** When switching from one docked screen to another: the camera pose to fly from (instead of the player's). */
+  from: { pos: THREE.Vector3; quat: THREE.Quaternion } | null;
+};
+
+/** Screens further than this are not drawn (DOM hidden, hole off: the bezel's dark back shows). */
+const MAX_SCREEN_DISTANCE = 32;
 
 const ease = (t: number) => t * t * (3 - 2 * t);
+
+/** True when the object and all its ancestors are visible. */
+function isShown(o: THREE.Object3D | null): boolean {
+  for (let n = o; n; n = n.parent) if (!n.visible) return false;
+  return true;
+}
 
 export class ScreenManager {
   readonly list: Screen[] = [];
@@ -208,16 +225,65 @@ export class ScreenManager {
     const s = this.byId.get(id);
     if (!s || !s.spec.dockable) return;
     if (this.dockState && this.dockState.screen !== s) return;
-    this.dockState = { screen: s, target: 1, blend: this.dockState?.blend ?? 0, pos: new THREE.Vector3(), quat: new THREE.Quaternion() };
+    this.dockState = { screen: s, target: 1, blend: this.dockState?.blend ?? 0, pos: new THREE.Vector3(), quat: new THREE.Quaternion(), from: this.dockState?.from ?? null };
     s.element.classList.add("is-docked");
     s.element.style.pointerEvents = "auto";
     this.onDock(id);
+  }
+
+  /**
+   * Dock `id` even when another screen is docked: the camera flies from where it is now straight
+   * to the new screen (used to bring up the comms display over whatever was engaged).
+   */
+  switchDock(id: string, camera: THREE.Camera) {
+    const s = this.byId.get(id);
+    if (!s || !s.spec.dockable) return;
+    const st = this.dockState;
+    if (!st) return this.dock(id);
+    if (st.screen === s && st.target === 1) return;
+    st.screen.element.classList.remove("is-docked");
+    st.screen.element.style.pointerEvents = "none";
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && st.screen.element.contains(active)) active.blur();
+    this.dockState = {
+      screen: s,
+      target: 1,
+      blend: 0,
+      pos: new THREE.Vector3(),
+      quat: new THREE.Quaternion(),
+      from: { pos: camera.position.clone(), quat: camera.quaternion.clone() },
+    };
+    s.element.classList.add("is-docked");
+    s.element.style.pointerEvents = "auto";
+    this.onDock(id);
+  }
+
+  /** Move a screen (and its hole and bezel) to a new pose. */
+  place(id: string, position: THREE.Vector3, yaw: number, pitch = 0) {
+    const s = this.byId.get(id);
+    if (!s) return;
+    s.anchor.position.copy(position);
+    s.anchor.rotation.set(-pitch, yaw, 0, "YXZ");
+    s.anchor.updateWorldMatrix(true, true);
+    this.syncTransform(s);
+  }
+
+  /** Show or hide a screen entirely (DOM, hole and bezel). */
+  setHidden(id: string, hidden: boolean) {
+    const s = this.byId.get(id);
+    if (!s) return;
+    s.anchor.visible = !hidden;
   }
 
   undock() {
     const st = this.dockState;
     if (!st || st.target === 0) return;
     st.target = 0;
+    // fly back to the player, not to the screen we switched from
+    if (st.from) {
+      st.blend = 1;
+      st.from = null;
+    }
     st.screen.element.classList.remove("is-docked");
     st.screen.element.style.pointerEvents = "none";
     const active = document.activeElement;
@@ -248,6 +314,10 @@ export class ScreenManager {
     st.blend = THREE.MathUtils.clamp(st.blend + (st.target === 1 ? dt : -dt) * speed, 0, 1);
     this.dockPose(st.screen, camera, st.pos, st.quat);
     const k = ease(st.blend);
+    if (st.from && st.target === 1) {
+      camera.position.copy(st.from.pos);
+      camera.quaternion.copy(st.from.quat);
+    }
     camera.position.lerp(st.pos, k);
     camera.quaternion.slerp(st.quat, k);
     if (st.target === 0 && st.blend <= 0) this.dockState = null;
@@ -265,7 +335,10 @@ export class ScreenManager {
       this.sphere.set(s.center, Math.hypot(s.width, s.height) / 2);
       // CSS3DRenderer only inserts an element into the page the first time it is visible, so every
       // screen is shown once up front: then all screen DOM is in the document from the start
-      const vis = !this.primed || s === docked || (facing && this.frustum.intersectsSphere(this.sphere));
+      const shown = isShown(s.anchor);
+      const near = toCam.length() < MAX_SCREEN_DISTANCE;
+      s.hole.visible = near || s === docked;
+      const vis = !this.primed || (shown && (s === docked || (facing && near && this.frustum.intersectsSphere(this.sphere))));
       s.css.visible = vis;
     }
     this.primedFrames++;

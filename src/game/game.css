@@ -461,3 +461,95 @@
     filter: none;
   }
 }
+
+/* --- the Market Observatory's screens */
+.vtg-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 12px 6px;
+}
+.vtg-pill {
+  font-family: Orbitron, sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  background: transparent;
+  color: rgba(159, 239, 255, 0.85);
+  border: 1px solid rgba(42, 212, 230, 0.35);
+  cursor: pointer;
+}
+.vtg-pill:hover {
+  background: rgba(42, 212, 230, 0.1);
+}
+.vtg-pill.is-on {
+  color: #0a1020;
+  background: #e8c15a;
+  border-color: #e8c15a;
+  box-shadow: 0 0 10px rgba(232, 193, 90, 0.5);
+}
+.vtg-mgrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px 16px;
+}
+.vtg-mbox .vtg-mgrid {
+  grid-template-columns: repeat(4, 1fr);
+}
+.vtg-mstat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.vtg-mstat .vtg-label {
+  font-size: 10px;
+}
+.vtg-mstat b {
+  font-size: 21px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.vtg-mbox {
+  margin-top: 10px;
+  padding: 9px 12px;
+  border: 1px solid rgba(42, 212, 230, 0.2);
+  background: rgba(42, 212, 230, 0.04);
+}
+.vtg-wcol {
+  flex: 1;
+  min-width: 0;
+  border-right: 1px solid rgba(42, 212, 230, 0.15);
+}
+.vtg-wcol:last-child {
+  border-right: none;
+}
+.vtg-whead {
+  font-family: Orbitron, sans-serif;
+  font-size: 22px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(42, 212, 230, 0.2);
+  white-space: nowrap;
+}
+.vtg-wrow {
+  font-size: 21px !important;
+  padding: 9px 16px !important;
+}
+.vtg-comms-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(159, 239, 255, 0.6);
+  font-family: Orbitron, sans-serif;
+  letter-spacing: 0.2em;
+  background: linear-gradient(180deg, #0a1428, #060818);
+  border: 1px solid rgba(42, 212, 230, 0.35);
+}
+.vtg-screen[data-screen="comms"] .vtg-screen-content {
+  background: linear-gradient(180deg, rgba(10, 20, 40, 0.96), rgba(6, 8, 24, 0.98));
+  border: 1px solid rgba(232, 193, 90, 0.5);
+}
