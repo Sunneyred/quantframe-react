@@ -700,7 +700,7 @@ def scenario_classic(s: Suite, w: int = 1280, h: int = 800, tag: str = "") -> No
         n0 = len(calls(pg, "get_stock_item_pagination"))
         H(pg, "h.emitUpdate('LiveScraper:RefreshStockItems', 'CREATE_OR_UPDATE', h.state.stockItems[0])")
         pg.wait_for_timeout(700)
-        H(pg, "h.emitMessage('App:OnNotify', { i18n_key: 'on_new_trade', color: 'green.7', type: 'success', settings: {}, values: { player_name: 'Ordis_Prime' } })")
+        H(pg, "h.emitMessage('App:OnNotify', { i18n_key: 'on_new_trade', color: 'green.7', type: 'success', settings: {}, values: { player_name: 'StarHollow' } })")
         H(pg, "h.emitMessage('LiveScraper:OnMessage', { i18nKey: 'riven.rate_limited', values: { seconds: 3 } })")
         pg.wait_for_timeout(800)
         s.check(len(calls(pg, "get_stock_item_pagination")) >= n0, "page broke on refresh event")
@@ -1547,7 +1547,7 @@ def station_buyers(s: Suite, view: str) -> None:
             pg.evaluate("async () => { const c = await import('/src/station/engine/constants.ts'); const x = c.TANK_FRAME.x + c.TANK_FRAME.w / 2, y = c.TANK_GLASS.y + 26; const px = x + 120, py = y + 110; window.__vtStation.travelTo(px, py, Math.atan2(y - py, x - px)); }")
             pg.wait_for_timeout(400)
         plat0 = H(pg, "h.state.platinum")
-        delivered = H(pg, "h.trade('Ordis_Prime', 78, 'Sale')")
+        delivered = H(pg, "h.trade('StarHollow', 78, 'Sale')")
         s.check(delivered == 1, f"add_trade has {delivered} listeners, expected exactly 1")
         pg.wait_for_timeout(500)
         s.check(text_visible(pg, ".vt-station-root", "+78"), "no '+78p' floater")
@@ -1562,7 +1562,7 @@ def station_buyers(s: Suite, view: str) -> None:
             s.check(text_visible(pg, ".vt-station-root", f"{plat0 + 78}p"), "readout not updated")
 
     with s.step(f"station {tag}: a purchase trade does not celebrate"):
-        H(pg, "h.trade('Baro_KiTeer', 20, 'Purchase', 'Blind Rage')")
+        H(pg, "h.trade('Orren_Vask', 20, 'Purchase', 'Blind Rage')")
         pg.wait_for_timeout(1800)
         s.check(not text_visible(pg, ".vt-station-root", "+20", timeout=500), "a purchase showed a gain")
 
@@ -1647,7 +1647,7 @@ def scenario_remount(s: Suite) -> None:
             s.check(now["bus"] == base["bus"], f"app event bus listeners changed: {now['bus']} vs {base['bus']}")
     with s.step("remount: events still arrive exactly once afterwards"):
         s.check(H(pg, "h.whisper('RemountCheck')") == 1, "vt_whisper listener count")
-        s.check(H(pg, "h.trade('Ordis_Prime', 11, 'Sale')") == 1, "add_trade listener count")
+        s.check(H(pg, "h.trade('StarHollow', 11, 'Sale')") == 1, "add_trade listener count")
         pg.wait_for_timeout(1500)
         if has_game(pg):
             s.check(G(pg, "g.customers.all.filter((c) => c.buyer.name === 'RemountCheck').length") == 1, "the whisper created more or fewer than one customer")
@@ -1825,7 +1825,7 @@ def scenario_dist(s: Suite) -> None:
         esc(pg)
         map_go(s, "Plat tank")
         s.check(H(pg, "h.whisper('DistBuyer')") == 1, "vt_whisper listener count")
-        s.check(H(pg, "h.trade('Ordis_Prime', 40, 'Sale')") == 1, "add_trade listener count")
+        s.check(H(pg, "h.trade('StarHollow', 40, 'Sale')") == 1, "add_trade listener count")
         pg.wait_for_timeout(600)
         s.check(text_visible(pg, ".vt-station-root", "+40"), "no sale floater")
         no_error_boundary(s, "dist events")
