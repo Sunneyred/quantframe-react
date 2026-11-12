@@ -354,7 +354,10 @@ export const robotServo: Voice = (r, out, t, o) => {
   // gear ripple
   const wob = r.gain(f * 0.06);
   r.osc("sine", 37, t).connect(wob).connect(osc.frequency);
-  osc.connect(bp).connect(g).connect(out);
+  // a motor behind a housing: nothing fizzy on top
+  const housing = r.filter("lowpass", 2600, 0.6);
+  g.connect(housing).connect(out);
+  osc.connect(bp).connect(g);
   const low = r.gain(0.5);
   osc.connect(r.filter("lowpass", 420, 0.7)).connect(low).connect(g);
   return t + dur + 0.05;
@@ -394,8 +397,8 @@ export const robotBeep: Voice = (r, out, t, o) => {
   const base = o.pitch ?? 990;
   const mood = o.mood ?? "ok";
   const n = mood === "sad" ? 2 : 2 + Math.floor(rnd() * 3);
-  const lp = r.filter("lowpass", 3000, 0.7);
-  lp.connect(out);
+  const lp = r.filter("lowpass", 2600, 0.7);
+  lp.connect(r.filter("lowpass", 3400, 0.6)).connect(out);
   let at = t;
   let step = Math.floor(rnd() * 3) + 1;
   for (let i = 0; i < n; i++) {

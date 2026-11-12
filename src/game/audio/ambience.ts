@@ -93,7 +93,7 @@ export class MarketTexture {
     this.nextGrain = t + 0.2;
     const r = (this.chain = new Rack(env));
     this.input = r.gain(1);
-    this.input.connect(r.filter("lowpass", 6500, 0.5)).connect(out);
+    this.input.connect(r.filter("lowpass", 6500, 0.5)).connect(r.filter("lowpass", 5200, 0.5)).connect(out);
     this.bed = r.gain(0);
     r.noise("pink", t, 0.25).connect(r.filter("bandpass", 1800, 0.6)).connect(this.bed).connect(this.input);
     this.setDensity(this._density, t);
@@ -117,7 +117,7 @@ export class MarketTexture {
   advance(until: number) {
     if (this.disposed) return;
     let guard = 0;
-    while (this.nextGrain < until && guard++ < 400) {
+    while (this.nextGrain < until && guard++ < 20000) {
       this.grain(this.nextGrain);
       // Poisson arrivals
       this.nextGrain += -Math.log(1 - this.rnd() * 0.999) / this.rate;
