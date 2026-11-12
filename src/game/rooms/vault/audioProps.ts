@@ -19,12 +19,12 @@ import { R } from "./shell";
  * Built from primitives with the shared Palette materials (by field name).
  */
 
-/** Deck position: a little ahead and right of the spawn, clear of the walls and of the walk north. */
-export const DECK_AT = polar(168, 7.4);
+/** Deck position: the sound corner between the announcements display and the Service Deck, by the master panel's pillar. */
+export const DECK_AT = polar(133, 8.3);
 /** The deck faces the spawn point. */
 const DECK_FACING = new THREE.Vector3(-1.4, 0, 9.3);
 /** The pillar that carries the master panel (pillars stand at 15 + 30k degrees). */
-export const PANEL_DEG = 195;
+export const PANEL_DEG = 135;
 const PANEL_Y = 1.36;
 const STEP = 0.05;
 const REACH = 2.7;

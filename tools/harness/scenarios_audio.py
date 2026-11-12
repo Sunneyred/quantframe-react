@@ -13,13 +13,13 @@ import os
 
 from lib import Suite
 
-STORAGE = {"vt_station_start": "0", "vt_game_quality": "low", "vt_game_view": "first"}
-# rooms/vault/audioProps.ts: the deck stands at polar(168, 7.4) and faces (-1.4, 9.3); the panel is on the pillar at 195 degrees
-DECK = (math.sin(math.radians(168)) * 7.4, -math.cos(math.radians(168)) * 7.4)
+STORAGE = {"vt_classic_mode": "0", "vt_game_quality": "low", "vt_game_view": "first", "vt_game_watchdog_ms": "600000"}
+# rooms/vault/audioProps.ts: the deck stands at polar(133, 8.3) and faces (-1.4, 9.3); the panel is on the pillar at 135 degrees
+DECK = (math.sin(math.radians(133)) * 8.3, -math.cos(math.radians(133)) * 8.3)
 _d = (-1.4 - DECK[0], 9.3 - DECK[1])
 _n = math.hypot(*_d)
 DECK_STAND = (DECK[0] + _d[0] / _n * 1.25, DECK[1] + _d[1] / _n * 1.25)
-PANEL_STAND = (math.sin(math.radians(195)) * 10.3, -math.cos(math.radians(195)) * 10.3)
+PANEL_STAND = (math.sin(math.radians(135)) * 10.3, -math.cos(math.radians(135)) * 10.3)
 
 
 def A(pg, expr: str):
@@ -42,16 +42,15 @@ def near(a, b, tol: float) -> bool:
 
 def open_game(s: Suite, first: bool = True):
     pg = s.page
-    pg.wait_for_selector("nav button", timeout=60000)
-    pg.wait_for_selector("[class*=splashScreen]", state="detached", timeout=30000)
-    pg.wait_for_timeout(300)
     enter_game(pg)
     return pg
 
 
 def enter_game(pg) -> None:
-    pg.evaluate("() => { if (location.pathname !== '/game') { history.pushState({}, '', '/game'); dispatchEvent(new PopStateEvent('popstate')); } }")
-    pg.wait_for_function("() => window.__vtGame && window.__vtGame.market.state.market", timeout=240000)
+    """The app is the ship; after leave() (classic view) the key chord brings it back."""
+    if pg.locator("[data-vtg-host]").count() == 0 and pg.locator("nav button").count() > 0:
+        pg.keyboard.press("Control+Shift+F12")
+    pg.wait_for_function("() => window.__vtGame && window.__vtGame.firstFrame && window.__vtGame.market.state.market", timeout=240000)
     pg.evaluate("() => window.__vtGame.engine.stop()")
     steps(pg, 3)
 
@@ -211,6 +210,10 @@ def audio_main(s: Suite) -> None:
         steps(pg, 2)
         s.check(A(pg, "a.settings.music") == 0.5, f"the wheel turns it down: {A(pg, 'a.settings.music')}")
         s.check(focused(pg)["label"] == "Music volume 50%", "the hint does not follow the knob")
+        try:  # the gain glides to its target on the audio clock
+            pg.wait_for_function("() => Math.abs(window.__vtGame.engine.audio.debug.musicGain - 0.25) < 0.02", timeout=8000)
+        except Exception:  # noqa: BLE001
+            pass
         s.check(abs(A(pg, "a.debug.musicGain") - 0.25) < 0.02, f"music gain {A(pg, 'a.debug.musicGain')} for the knob at 50 %")
         s.check(len(triggers(pg, "knob")) == 6, f"{len(triggers(pg, 'knob'))} knob detents for 6 steps")
         stand(pg, DECK_STAND, "play")
@@ -408,6 +411,6 @@ def audio_remount(s: Suite) -> None:
 
 
 def leave(pg) -> None:
-    pg.evaluate("() => { history.pushState({}, '', '/trading_analytics'); dispatchEvent(new PopStateEvent('popstate')); }")
+    pg.keyboard.press("Control+Shift+F12")  # the classic view: the game unmounts
     pg.wait_for_selector("[data-vtg-host]", state="detached", timeout=30000)
     pg.wait_for_function("() => window.__vtAudioDebug.global.open === 0", timeout=15000)
