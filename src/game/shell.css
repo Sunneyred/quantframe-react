@@ -1,0 +1,34 @@
+/* The world-only shell: rules that keep the in-world DOM layer registered with the WebGL canvas.
+
+   The DOM of every screen lives in the CSS3D layer under the canvas, far outside the layer's box
+   once transformed. `overflow: hidden` still lets the browser scroll such a box programmatically:
+   focusing a field (a dialog's focus trap, Tab, a click on a control near the edge) scrolls the
+   layer to "bring it into view", and from then on every screen is drawn shifted against its hole
+   in the canvas and clicks land beside their targets. `overflow: clip` cannot be scrolled at all. */
+.vtg-host,
+.vtg-root {
+  overflow: clip;
+}
+.vtg-css {
+  overflow: clip !important; /* CSS3DRenderer sets overflow: hidden inline */
+}
+.vtg-screen-content {
+  overflow: clip;
+}
+
+/* The app theme (void-trader.css) gives every Paper and Card a backdrop blur. On a screen the
+   backdrop is the screen's own opaque face, so the blur shows nothing, but inside the 3D-transformed
+   layer every blurred element becomes its own render surface: an embedded page with a table of
+   cards, or a dialog over it, costs seconds per frame and hundreds of megabytes. Off on screens. */
+.vtg-screen .mantine-Paper-root,
+.vtg-screen .mantine-Card-root,
+.vtg-screen .mantine-Modal-overlay,
+.vtg-screen .mantine-Overlay-root {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* The page background drifts forever (void-trader.css). Under the game it is never seen. */
+body:has(.vtg-host) {
+  animation: none;
+}

@@ -19,10 +19,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib import HERE, ROOT, Server, Suite  # noqa: E402
+import scenarios_shell  # noqa: E402
 
 DEFAULT_SHOTS = HERE / "shots"
 
-NAV = ["station", "home", "live_scraper", "warframe_market", "chat", "trading_analytics", "wf_inventory", "trade_messages", "debug", "about"]
+# The logged-in app is the 3D game; the classic view is its hidden fallback (src/game/shellMode.ts).
+# Every session opens in the classic fallback unless a scenario asks for the ship with SHIP.
+CLASSIC = {"vt_classic_mode": "1"}
+SHIP = {"vt_classic_mode": "0", "vt_game_quality": "low", "vt_game_view": "first", "vt_game_watchdog_ms": "600000"}
+
+NAV = ["ship", "station", "home", "live_scraper", "warframe_market", "chat", "trading_analytics", "wf_inventory", "trade_messages", "debug", "about"]
 PATHS = {"station": "/station", "home": "/", "live_scraper": "/live_scraper", "warframe_market": "/warframe-market", "chat": "/chat", "trading_analytics": "/trading_analytics", "wf_inventory": "/wf_inventory", "trade_messages": "/trade_messages", "debug": "/debug", "about": "/about"}
 
 # What each station terminal must show: (panel id, map entry, text that proves the real page rendered,
@@ -143,6 +149,21 @@ def wait_app(s: Suite, timeout: int = 40000) -> None:
     s.page.wait_for_timeout(300)
 
 
+def wait_game(s: Suite, timeout: int = 180000) -> None:
+    """The ship is up: first frame drawn, splash gone. The engine is then stopped (software WebGL
+    is slow; tests step it with game_steps) and a few frames are drawn."""
+    pg = s.page
+    pg.set_default_timeout(60000)
+    pg.wait_for_function("() => window.__vtGame && window.__vtGame.firstFrame", timeout=timeout)
+    pg.wait_for_selector("[class*=splashScreen]", state="detached", timeout=30000)
+    pg.evaluate("() => window.__vtGame.engine.stop()")
+    # The real game requests a frame every tick. With the engine stopped nothing does, and headless
+    # Chromium then delivers the frames that Mantine's transitions (dialogs, popovers) wait for only
+    # after minutes. An empty animation-frame loop keeps frames coming at almost no cost.
+    pg.evaluate("() => { if (!window.__harnessPump) { window.__harnessPump = true; (function loop() { requestAnimationFrame(loop); })(); } }")
+    game_steps(pg, 3)
+
+
 def nav(s: Suite, target: str) -> None:
     pg = s.page
     buttons = pg.locator("nav button")
@@ -211,6 +232,13 @@ def close_notifications(pg) -> None:
 # --------------------------------------------------------------------------------------------
 # station helpers
 # --------------------------------------------------------------------------------------------
+
+
+def enter_station(s: Suite) -> None:
+    """The old 2D station is no start page any more: it is reached from the classic side bar."""
+    wait_app(s)
+    nav(s, "station")
+    station_ready(s)
 
 
 def station_ready(s: Suite) -> None:
@@ -321,21 +349,17 @@ def check_panel(s: Suite, panel_id: str, proof: str, control, after: str | None,
 
 
 def scenario_boot(s: Suite) -> None:
-    with s.step("boot: station start on (default) lands in the station"):
-        pg = s.open(1280, 800)
-        wait_app(s)
-        pg.wait_for_function("() => location.pathname === '/station'", timeout=10000)
-        station_ready(s)
+    with s.step("boot: lands in the ship (the 3D game), with no app frame"):
+        pg = s.open(1280, 800, storage=SHIP)
+        wait_game(s)
         no_error_boundary(s, "boot")
-        s.check(pg.locator("canvas.vt-station-canvas").count() >= 1, "no station canvas")
+        s.check(pg.evaluate("() => location.pathname") == "/", f"landed on {pg.url}")
+        s.check(pg.locator("canvas.vtg-canvas").count() == 1, "no game canvas")
+        s.check(pg.locator("nav button").count() == 0 and pg.locator("header").count() == 0 and pg.locator(".mantine-AppShell-root").count() == 0, "the classic app frame is mounted in the ship")
+        s.check(V(pg, "g.where") == "vault", "did not start in the vault")
         s.check(H(pg, "h.counts['auth_me']") == 1, "auth_me was not called exactly once")
-        s.check(pg.evaluate("() => localStorage.getItem('vt_station_start')") != "0", "the crash safety net switched the station start off")
-        s.check(pg.locator("nav button").nth(0).get_attribute("data-active") == "true", "side bar does not mark Station as the current page after the start redirect")
-
-    with s.step("boot: Home link after a station start shows Home (no redirect loop)"):
-        nav(s, "home")
-        s.check(text_visible(pg, ".mantine-AppShell-main", "Total Profit"), "Home did not render")
-        s.check(pg.locator("nav button").nth(1).get_attribute("data-active") == "true", "side bar does not mark Home")
+        s.check(pg.evaluate("() => localStorage.getItem('vt_classic_mode')") != "1", "the crash fallback switched to the classic view")
+        s.check(pg.evaluate("() => localStorage.getItem('vt_classic_reason')") is None, "a fallback reason was recorded on a clean boot")
 
     with s.step("boot: an unhandled error is logged to the backend once, with valid arguments", allow=[r"harness-made rejection", r"Unhandled error"]):
         n0 = len(calls(pg, "log"))
@@ -348,48 +372,57 @@ def scenario_boot(s: Suite) -> None:
             s.check(args.get("message") == "harness-made rejection" and isinstance(args.get("context"), dict) and "stack" in args["context"], f"error details not sent as `context`: {args}")
             s.check("error" not in logged[0], f"the backend would reject the log call: {logged[0].get('error')}")
 
-    with s.step("boot: station start off lands on Home"):
-        pg = s.open(1280, 800, storage={"vt_station_start": "0"})
+    with s.step("boot: a deep link still lands in the ship (every logged-in route is the game)"):
+        pg = s.open(1280, 800, path="/live_scraper", storage=SHIP)
+        wait_game(s)
+        s.check(pg.locator("nav button").count() == 0 and pg.locator(".mantine-AppShell-root").count() == 0, "a classic route rendered in the ship")
+        no_error_boundary(s, "deep link")
+
+    with s.step("boot: with the classic fallback remembered, the app opens on classic Home"):
+        pg = s.open(1280, 800, storage=CLASSIC)
         wait_app(s)
         pg.wait_for_timeout(800)
         s.check(pg.evaluate("() => location.pathname") == "/", f"landed on {pg.url}")
         s.check(text_visible(pg, ".mantine-AppShell-main", "Total Profit"), "Home did not render")
         s.check(pg.locator("canvas.vt-station-canvas").count() == 0, "station canvas on Home")
+        s.check(pg.locator("[data-vtg-host]").count() == 0, "the game is mounted in the classic view")
+        s.check(pg.locator("nav [data-vt-return-ship]").count() == 1, "no 'Return to the ship' control in the classic view")
 
     with s.step("boot: reloading on a classic route comes back up without errors"):
         # upstream behaviour: while auth_me is loading the gate sends every route to the start page
-        pg = s.open(1280, 800, path="/live_scraper", storage={"vt_station_start": "0"})
+        pg = s.open(1280, 800, path="/live_scraper", storage=CLASSIC)
         wait_app(s)
         pg.wait_for_timeout(800)
         s.check(pg.evaluate("() => location.pathname") in ("/", "/live_scraper"), f"landed on {pg.url}")
         no_error_boundary(s, "reload on a route")
 
     with s.step("boot: backend still starting shows the splash, then app:ready opens the app"):
-        pg = s.open(1280, 800, options={"started": False})
+        pg = s.open(1280, 800, options={"started": False}, storage=SHIP)
         pg.wait_for_timeout(1500)
-        s.check(pg.locator("nav button").count() == 0, "layout shown before the backend was ready")
+        s.check(pg.locator("[data-vtg-host]").count() == 0 and pg.locator("nav button").count() == 0, "the app was shown before the backend was ready")
+        s.check(pg.locator("[class*=splashScreen]").count() >= 1, "no splash screen while the backend starts")
         delivered = H(pg, "h.ready()")
         s.check(delivered >= 1, "nobody listens to app:ready")
-        wait_app(s)
-        pg.wait_for_function("() => location.pathname === '/station'", timeout=10000)
-        station_ready(s)
+        wait_game(s)
         no_error_boundary(s, "late start")
 
     with s.step("boot: logged out shows the login page; logging in opens the app"):
-        pg = s.open(1280, 800, options={"loggedIn": False})
+        pg = s.open(1280, 800, options={"loggedIn": False}, storage=SHIP)
         pg.wait_for_function("() => location.pathname === '/auth/login'", timeout=20000)
         pg.wait_for_selector("input[type=password]", timeout=10000)
+        s.check(pg.locator("[data-vtg-host]").count() == 0, "the game is mounted on the login page")
         pg.locator("input").first.fill("tester@example.invalid")
         pg.locator("input[type=password]").fill("correct horse")
         pg.locator("form button[type=submit], form button").last.click()
         pg.wait_for_function("() => location.pathname !== '/auth/login'", timeout=10000)
-        wait_app(s)
+        wait_game(s)
         s.check(len(calls(pg, "auth_login")) == 1, "auth_login not called")
-        pg.wait_for_timeout(1200)
+        s.check(pg.locator("nav button").count() == 0, "the classic side bar is shown after logging in")
         no_error_boundary(s, "after login")
 
-    with s.step("boot: new terms of service must be accepted"):
-        pg = s.open(1280, 800, options={"tosAccepted": False}, storage={"vt_station_start": "0"})
+    # the same two dialogs inside the ship (on the Comms display) are in the `shell` scenario
+    with s.step("boot: new terms of service must be accepted (classic view)"):
+        pg = s.open(1280, 800, options={"tosAccepted": False}, storage=CLASSIC)
         wait_app(s)
         pg.wait_for_selector(".mantine-Modal-content", timeout=8000)
         s.check(text_visible(pg, ".mantine-Modal-content", "Data Protection Policy"), "terms text (src-tauri/resources/tos.md) not shown")
@@ -401,8 +434,8 @@ def scenario_boot(s: Suite) -> None:
         pg.wait_for_timeout(600)
         s.check(len(calls(pg, "app_accept_tos")) == 1 or len(calls(pg, "app_exit")) == 1, "neither accept nor decline reached the backend")
 
-    with s.step("boot: update available dialog"):
-        pg = s.open(1280, 800, options={"updateAvailable": True}, storage={"vt_station_start": "0"})
+    with s.step("boot: update available dialog (classic view)"):
+        pg = s.open(1280, 800, options={"updateAvailable": True}, storage=CLASSIC)
         wait_app(s)
         pg.wait_for_selector(".mantine-Modal-content", timeout=8000)
         s.check(text_visible(pg, ".mantine-Modal-content", "1.13.0"), "new version not shown")
@@ -821,8 +854,7 @@ def scenario_classic_offline(s: Suite) -> None:
 
     with s.step("no inventory: station shows the not-connected state"):
         pg = s.open(1280, 800, options={"inventory": "none"})
-        wait_app(s)
-        station_ready(s)
+        enter_station(s)
         map_go(s, "Docks board")
         press_use(pg)
         s.check(card(pg, "docks").count() == 1, "docks card missing")
@@ -849,9 +881,7 @@ def scenario_station(s: Suite, fp: bool = False) -> None:
     tag = "first person" if fp else "top-down"
     with s.step(f"station {tag}: opens"):
         pg = s.open(1280, 800, storage={"vt_station_view": view} if fp else None)
-        wait_app(s)
-        pg.wait_for_function("() => location.pathname === '/station'", timeout=10000)
-        station_ready(s)
+        enter_station(s)
         no_error_boundary(s, "station")
         s.check(H(pg, "Object.keys(h.unknown).length") == 0, "unknown commands at start")
         if has_game(pg):
@@ -1051,11 +1081,11 @@ def scenario_station(s: Suite, fp: bool = False) -> None:
         pg.wait_for_timeout(700)
         s.check(text_visible(pg, ".mantine-AppShell-main", "Total Profit"), "Home not shown (redirected back?)")
         s.check(pg.locator("canvas").filter(has=pg.locator("xpath=self::*[contains(@class,'vt-station-canvas')]")).count() == 0, "station canvas left behind on Home")
-        s.check(pg.locator("nav button").nth(1).get_attribute("data-active") == "true", "side bar does not mark Home after leaving the station")
+        s.check(pg.locator("nav button").nth(NAV.index("home")).get_attribute("data-active") == "true", "side bar does not mark Home after leaving the station")
         nav(s, "station")
         station_ready(s)
         no_error_boundary(s, "returned")
-        s.check(pg.locator("nav button").nth(0).get_attribute("data-active") == "true", "side bar does not mark Station")
+        s.check(pg.locator("nav button").nth(NAV.index("station")).get_attribute("data-active") == "true", "side bar does not mark Station")
 
     with s.step(f"station {tag}: log out from the captain's console"):
         open_panel(s, "captain", "Captain's console")
@@ -1568,12 +1598,42 @@ def station_buyers(s: Suite, view: str) -> None:
 
 
 def scenario_safety(s: Suite) -> None:
-    """The two safety nets: a page that crashes inside a panel, and the station itself crashing."""
-    crash = [r"Cannot read properties of null", r"The above error occurred", r"\[station\] crashed", r"React will try to recreate", r"error boundary", r"Unhandled error", r"An error occurred in"]
+    """The safety nets. The ship: a page that crashes inside a terminal is contained; no WebGL, no
+    first frame or a crash of the game itself opens the classic view (never a dead end). The old
+    station: a page that crashes inside a panel, and the station itself crashing."""
+    crash = [r"Cannot read properties of null", r"The above error occurred", r"\[station\] crashed", r"\[game\]", r"\[shell\]", r"test fault", r"React will try to recreate", r"error boundary", r"Unhandled error", r"An error occurred in"]
+    with s.step("safety: a page that crashes inside a Service Deck terminal does not take the ship down", allow=crash):
+        pg = s.open(1280, 800, options={"corrupt": "orders"}, storage=SHIP)
+        wait_game(s)
+        pg.evaluate("() => { const g = window.__vtGame; g.goToTerminal('market'); g.engine.screens.dock('svc-market'); }")
+        game_steps(pg, 30)
+        pg.wait_for_selector("[data-screen='svc-market'] [data-vtg-term-fault]", state="attached", timeout=60000)
+        s.check(pg.locator("[data-vtg-host]").count() == 1 and pg.locator("nav button").count() == 0, "the ship went down with the terminal")
+        s.check(pg.evaluate("() => localStorage.getItem('vt_classic_mode')") != "1", "a terminal crash switched to the classic view")
+        pg.keyboard.press("Escape")
+        game_steps(pg, 30)
+    with s.step("safety: the ship keeps working after a terminal crashed"):
+        pg.evaluate("() => { const g = window.__vtGame; g.goToTerminal('home'); g.engine.screens.dock('svc-home'); }")
+        game_steps(pg, 30)
+        pg.wait_for_selector("[data-vtg-term-page=home]", state="attached", timeout=60000)
+        s.check(text_visible(pg, "[data-vtg-term-page=home]", "Total Profit", timeout=60000), "another terminal does not open any more")
+    for fault, why, extra in (("webgl", "WebGL unavailable", {}), ("stall", "no first frame", {"vt_game_watchdog_ms": "1500"}), ("crash", "crash", {})):
+        with s.step(f"safety: game fault '{fault}' opens the classic view, with trades reachable", allow=crash):
+            pg = s.open(1280, 800, storage={**SHIP, **extra, "vt_game_test_fault": fault})
+            pg.set_default_timeout(60000)
+            wait_app(s, timeout=120000)
+            s.check(pg.evaluate("() => localStorage.getItem('vt_classic_mode')") == "1", "the fallback was not remembered")
+            reason = pg.evaluate("() => localStorage.getItem('vt_classic_reason')") or ""
+            s.check(why in reason, f"fallback reason is '{reason}'")
+            s.check(pg.locator("[data-vtg-host]").count() == 0, "the broken game is still mounted")
+            s.check(text_visible(pg, "body", "The ship could not start"), "the owner is not told why the classic view opened")
+            s.check("Unexpected Application Error" not in pg.evaluate("() => document.body.innerText"), "router error page")
+            close_notifications(pg)
+            nav(s, "live_scraper")
+            s.check(text_visible(pg, ".mantine-AppShell-main", "Glaive Prime Set"), "trades not reachable in the fallback")
     with s.step("safety: a page that crashes inside a panel does not take the station down", allow=crash):
         pg = s.open(1280, 800, options={"corrupt": "orders"})
-        wait_app(s)
-        station_ready(s)
+        enter_station(s)
         open_panel(s, "market", "Market terminal")
         s.check(text_visible(pg, ".vt-station-holo-body", "could not be shown here"), "the panel's error boundary did not catch the crash")
         s.check("The station hit an error" not in pg.evaluate("() => document.body.innerText"), "the whole station went down")
@@ -1590,6 +1650,7 @@ def scenario_safety(s: Suite) -> None:
     with s.step("safety: a crash of the station itself shows the way out and turns the station start off", allow=crash):
         pg = s.open(1280, 800, options={"corrupt": "stock"})
         wait_app(s)
+        nav(s, "station")
         pg.wait_for_function("() => document.body.innerText.includes('The station hit an error')", timeout=15000)
         s.check(pg.evaluate("() => localStorage.getItem('vt_station_start')") == "0", "the station start was not switched off after the crash")
         s.check(pg.locator("nav button").count() >= 9, "the side bar is gone: no way out")
@@ -1610,8 +1671,7 @@ def scenario_safety(s: Suite) -> None:
 def scenario_remount(s: Suite) -> None:
     with s.step("remount: baseline in the station"):
         pg = s.open(1280, 800)
-        wait_app(s)
-        station_ready(s)
+        enter_station(s)
         pg.wait_for_timeout(800)
     base = {
         "canvases": pg.locator("canvas").count(),
@@ -1659,10 +1719,9 @@ def scenario_remount(s: Suite) -> None:
         nothing_open(s, "after returning")
         no_error_boundary(s, "after returning")
     with s.step("remount: browser reload inside the station"):
+        # the station is not a start page any more: a reload comes up in the classic view
         pg.reload()
-        wait_app(s)
-        pg.wait_for_function("() => location.pathname === '/station'", timeout=10000)
-        station_ready(s)
+        enter_station(s)
         no_error_boundary(s, "reload")
 
 
@@ -1673,8 +1732,7 @@ def scenario_layout(s: Suite, w: int, h: int, classic: bool = True, alerts: bool
         scenario_classic(s, w, h, tag)
     with s.step(f"layout{tag}: station"):
         pg = s.open(w, h, options={"alerts": alerts})
-        wait_app(s)
-        station_ready(s)
+        enter_station(s)
         root = pg.locator(".vt-station-root").bounding_box()
         foot = pg.locator(".vt-station-footer").bounding_box()
         stage = pg.locator(".vt-station-stage").bounding_box()
@@ -1758,12 +1816,23 @@ def scenario_layout(s: Suite, w: int, h: int, classic: bool = True, alerts: bool
 def scenario_dist(s: Suite) -> None:
     """The production bundle (dist/): boots, every route and every station panel renders."""
     main = ".mantine-AppShell-main"
-    with s.step("dist: boots into the station"):
-        pg = s.open(1280, 800)
-        wait_app(s)
-        pg.wait_for_function("() => location.pathname === '/station'", timeout=10000)
-        station_ready(s)
+    with s.step("dist: boots into the ship (the 3D game), nothing else on screen"):
+        pg = s.open(1280, 800, storage=SHIP)
+        pg.set_default_timeout(60000)
+        pg.wait_for_selector("canvas.vtg-canvas", state="attached", timeout=120000)
+        pg.wait_for_selector("[class*=splashScreen]", state="detached", timeout=30000)
+        pg.wait_for_function("() => window.__HARNESS__.counts['vt_plat_goal'] > 0", timeout=60000)
+        pg.wait_for_selector("[data-screen='svc-live'] [data-vtg-term-idle]", state="attached", timeout=60000)
+        s.check(pg.evaluate("() => !window.__vtGame"), "the dev-only game handle is present in the production bundle")
+        s.check(pg.locator("nav button").count() == 0 and pg.locator(".mantine-AppShell-root").count() == 0, "the classic app frame is mounted in the ship")
+        s.check(pg.evaluate("() => localStorage.getItem('vt_classic_mode')") != "1", "the ship fell back to the classic view")
         no_error_boundary(s, "dist boot")
+    with s.step("dist: the key chord opens the classic view; the station is reached from its side bar"):
+        pg.keyboard.press("Control+Shift+F12")
+        pg.wait_for_selector("[data-vtg-host]", state="detached", timeout=20000)
+        pg.set_default_timeout(10000)
+        enter_station(s)
+        no_error_boundary(s, "dist station")
         s.check(not has_game(pg), "the dev-only game handle is present in the production bundle")
         s.check(pg.locator(".vt-station-footer").get_by_text("Demo data").count() == 0, "demo data badge in the production bundle")
         s.check(pg.locator("[data-station-command^='debug-']").count() == 0, "debug commands exposed")
@@ -1842,19 +1911,15 @@ def game_steps(pg, n: int = 10) -> None:
 
 
 def scenario_game(s: Suite) -> None:
-    """The 3D game on the real app with the mock: walk from the Vault to the Market Observatory,
+    """The 3D game (the app's shell) on the real app with the mock: walk from the Vault to the Market Observatory,
     focus a star, raise its order book on the spire, see an undercut, dock the Market Console, use
     search and filters, route an app modal onto the Comms display, and leave the route cleanly."""
     with s.step("game: boots on /game with the market overview"):
-        pg = s.open(1280, 800, storage={"vt_station_start": "0", "vt_game_quality": "low", "vt_game_view": "first"})
-        wait_app(s)
+        pg = s.open(1280, 800, storage=SHIP)
         # software WebGL plus the 3D-transformed DOM layer make every composited frame slow here:
         # in-world controls are clicked with dispatched events, and waits are generous
-        pg.set_default_timeout(60000)
-        # the app lands on Home after boot; open the game route through the router
-        pg.evaluate("() => { history.pushState({}, '', '/game'); dispatchEvent(new PopStateEvent('popstate')); }")
+        wait_game(s)
         pg.wait_for_function("() => window.__vtGame && window.__vtGame.market.state.market", timeout=60000)
-        pg.evaluate("() => window.__vtGame.engine.stop()")
         n = V(pg, "g.market.state.market.overview.items.length")
         s.check(n and n > 1200, f"only {n} stars in the overview")
         s.check(len(calls(pg, "vt_market_overview")) >= 1, "vt_market_overview never called")
@@ -1936,9 +2001,10 @@ def scenario_game(s: Suite) -> None:
         pg.evaluate("() => window.__vtGame.engine.setView('third')")
         game_steps(pg, 30)
         pg.evaluate("() => window.__vtGame.engine.setView('first')")
-    with s.step("game: leaving for a lazy route unmounts the game at once"):
-        pg.evaluate("() => { history.pushState({}, '', '/trading_analytics'); dispatchEvent(new PopStateEvent('popstate')); }")
+    with s.step("game: leaving for the classic view (key chord) unmounts the game at once"):
+        pg.keyboard.press("Control+Shift+F12")
         pg.wait_for_selector("[data-vtg-host]", state="detached", timeout=10000)
+        pg.wait_for_selector("nav button", timeout=20000)
         s.check(pg.evaluate("() => !document.querySelector('.vtg-root') && !window.__vtGame"), "game DOM or handle left behind")
         s.check(pg.evaluate("() => { const n = document.querySelector('[data-mantine-shared-portal-node]'); return !n || document.body.contains(n); }"), "portal node lost")
 
@@ -1954,6 +2020,7 @@ SCENARIOS = {
     "layout": lambda s: scenario_layout(s, DEFAULT_WINDOW[0], DEFAULT_WINDOW[1]),
     "small": lambda s: scenario_layout(s, 1280, 800, classic=False, alerts=False),
     "game": lambda s: scenario_game(s),
+    "shell": lambda s: scenarios_shell.scenario_shell(s, sys.modules[__name__]),
 }
 
 
@@ -1985,6 +2052,7 @@ def main() -> int:
         server = Server("dev")
         try:
             suite = Suite(shots, server, "dev")
+            suite.default_storage = CLASSIC
             for name in dev:
                 print(f"--- scenario {name}", flush=True)
                 try:
@@ -2003,6 +2071,7 @@ def main() -> int:
         server = Server("dist")
         try:
             suite = Suite(shots, server, "dist")
+            suite.default_storage = CLASSIC
             print("--- scenario dist", flush=True)
             try:
                 scenario_dist(suite)

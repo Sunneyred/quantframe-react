@@ -1,6 +1,7 @@
 import { closeAllModals } from "@mantine/modals";
 import * as THREE from "three";
 import type { Engine } from "./core/Engine";
+import { CSS_SCALE } from "./core/screens";
 
 /**
  * Mantine modals opened by the app while the game is mounted, routed into the world.
@@ -77,27 +78,58 @@ export class ModalRouter {
     const { screens, camera } = this.engine;
     const docked = screens.docked;
     this.prevDock = docked && docked.id !== this.screenId ? docked.id : null;
+    // how far the camera stands from a screen of this size when it is engaged
+    const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+    const reach = (w: number, h: number, fill: number) => Math.max(h / 2 / (tanV * fill), w / 2 / (tanV * camera.aspect * fill));
+    const base = (this.base ??= { w: screen.width, h: screen.height });
+    const own = reach(base.w, base.h, screen.spec.fill ?? 0.84);
     if (docked && docked.id !== this.screenId) {
-      // just in front of the engaged screen, same orientation
-      const pos = docked.center.clone().addScaledVector(docked.normal, 0.3);
+      // Just in front of the engaged screen, same orientation, and sized so that the camera hardly
+      // moves: the display is read from where the camera already is. (At its full size the camera,
+      // a hand's width from it, would see its DOM magnified several times for the length of the
+      // flight back, which costs the browser seconds and a great deal of memory.)
+      const gap = 0.06;
+      const from = reach(docked.width, docked.height, docked.spec.fill ?? 0.84);
+      this.resize(THREE.MathUtils.clamp((from - gap) / own, 0.12, 1));
+      const pos = docked.center.clone().addScaledVector(docked.normal, gap);
       const yaw = Math.atan2(docked.normal.x, docked.normal.z);
       const pitch = Math.asin(THREE.MathUtils.clamp(docked.normal.y, -1, 1));
       screens.place(this.screenId, pos, yaw, pitch);
     } else {
-      // in front of the camera, at eye height, facing it
-      const fwd = new THREE.Vector3();
-      camera.getWorldDirection(fwd);
-      fwd.y = 0;
-      if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1);
-      fwd.normalize();
-      const pos = camera.position.clone().addScaledVector(fwd, 1.6);
-      pos.y = Math.max(1.2, camera.position.y - 0.05);
+      // in front of the player, at eye height, facing them. The player's pose is used, not the
+      // camera's: at boot (update and terms dialogs open before the first frame) the camera has no
+      // pose yet, and in third person it trails behind. The distance shrinks when something solid
+      // is in the way, so the display never ends up inside a wall or the reservoir.
+      const { player, world } = this.engine;
+      const eye = player.eye(new THREE.Vector3());
+      const fwd = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+      const want = 1.6;
+      const clear = world.sweep({ x: eye.x, z: eye.z }, { x: eye.x + fwd.x * (want + 0.4), z: eye.z + fwd.z * (want + 0.4) }, 0.2);
+      const dist = Math.max(0.6, Math.min(want, (want + 0.4) * clear - 0.3));
+      // full size when there is room; smaller when it is close, so the camera never backs into a wall
+      this.resize(Math.min(1, dist / own));
+      const pos = eye.clone().addScaledVector(fwd, dist);
+      pos.y = Math.max(1.2, eye.y - 0.05);
       screens.place(this.screenId, pos, Math.atan2(-fwd.x, -fwd.z));
     }
+    this.onShow?.();
     screen.content.appendChild(this.node);
     screens.setHidden(this.screenId, false);
     if (screens.busy) screens.switchDock(this.screenId, camera);
     else screens.dock(this.screenId);
+  }
+
+  private base: { w: number; h: number } | null = null;
+
+  /** Scale the display in the world (hole, bezel and DOM plane together); its DOM size is unchanged. */
+  private resize(k: number) {
+    const screen = this.screen;
+    if (!screen || !this.base) return;
+    const pw = parseFloat(screen.element.style.width) || screen.spec.px[0];
+    screen.anchor.scale.setScalar(k);
+    screen.width = this.base.w * k;
+    screen.height = this.base.h * k;
+    screen.css.scale.setScalar((screen.width / pw) * CSS_SCALE);
   }
 
   private hide() {
@@ -113,7 +145,23 @@ export class ModalRouter {
     screens.setHidden(this.screenId, true);
   }
 
+  /**
+   * True while a modal that must be answered is open (the app opened it with closeOnEscape off:
+   * the terms of service, a forced update). Disengaging the display then does not dismiss it.
+   */
+  locked = false;
+  /** Called just before the display is shown (GameCore sizes it to the window). */
+  onShow: (() => void) | null = null;
+
   private onDock(id: string | null) {
+    if (id === null && this.open && this.locked) {
+      // Esc does not close this modal in the classic view either: stay on the display
+      // (after this event has reached every listener, so they see "undocked" then "docked" in order)
+      queueMicrotask(() => {
+        if (!this.disposed && this.open && this.locked) this.engine.screens.dock(this.screenId);
+      });
+      return;
+    }
     // Esc or Disengage on the comms screen while a modal is up: close the modals
     if (id === null && this.open) {
       this.dismissed = true;

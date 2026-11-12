@@ -8,10 +8,12 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useTranslateComponent } from "@hooks/useTranslate.hook";
 import { faWarframeMarket, facTradingAnalytics } from "@icons";
 import { AppShell, Box, Indicator } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { open } from "@tauri-apps/plugin-shell";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { prefetchRoute } from "../routeLoaders";
+import { classicReason, setClassic, useClassicMode } from "../../../game/shellMode";
 import classes from "./LogInLayout.module.css";
 
 export function LogInLayout() {
@@ -48,9 +50,10 @@ export function LogInLayout() {
         align: "top",
         id: "game",
         link: "game",
-        icon: <FontAwesomeIcon size={"lg"} icon={faStar} />,
-        label: "Void Trader (3D)",
-        onClick: (e: NavbarLinkProps) => handleNavigate(e),
+        icon: <FontAwesomeIcon size={"lg"} icon={faStar} data-vt-return-ship />,
+        label: "Return to the ship",
+        // leaves the classic view (a hidden fallback) for the 3D game and forgets the fallback
+        onClick: () => setClassic(false),
       },
       {
         align: "top",
@@ -161,6 +164,21 @@ export function LogInLayout() {
     if (user?.qf_banned || user?.wfm_banned) navigate("/error/banned");
   }, [user, navigate]);
 
+  // Void Trader: the classic view is only shown as a fallback. When a game failure brought the
+  // owner here, say so once and point at the way back.
+  const classic = useClassicMode();
+  useEffect(() => {
+    const reason = classic ? classicReason() : null;
+    if (!reason) return;
+    notifications.show({
+      id: "vt-classic-fallback",
+      title: "The ship could not start",
+      message: `You are in the classic view and your trades are safe (${reason}). The star at the top of the side bar returns to the ship.`,
+      color: "yellow.7",
+      autoClose: 20000,
+    });
+  }, [classic]);
+
   // Toggle dev mode when Shift is pressed.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -171,6 +189,14 @@ export function LogInLayout() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
+
+  // In the ship nothing of the app frame exists: no header, no side bar, no alert ticker.
+  if (!classic)
+    return (
+      <Suspense fallback={null}>
+        <Outlet />
+      </Suspense>
+    );
 
   return (
     <AppShell

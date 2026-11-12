@@ -3,7 +3,8 @@ import { useAuthContext } from "@contexts/auth.context";
 import { lazy } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { routeLoaders } from "./routeLoaders";
-import { StationStartGate } from "../../station/StartGate";
+import GameShell from "../../game/GameShell";
+import { useClassicChord, useClassicMode } from "../../game/shellMode";
 
 // Layouts
 import { CleanLayout } from "./Clean";
@@ -54,12 +55,14 @@ const WfInventoryPage = lazy(routeLoaders.wfInventory);
 
 // Void Trader: the walk-around station
 const PStation = lazy(() => import("../../station/StationSafe"));
-// Void Trader: the game (phase 1, the Vault)
-const PGame = lazy(() => import("../../game/GamePage"));
 
 export function AppRoutes() {
   const { app_error } = useAppContext();
   const { user } = useAuthContext();
+  // Void Trader: the logged-in app is the ship (the 3D game). The classic view below is a hidden
+  // fallback, entered only by a game failure or the secret key chord (see game/shellMode.ts).
+  const classic = useClassicMode();
+  useClassicChord();
 
   const ShowErrorPage = () => {
     if (window.location.href.includes("clean")) return false;
@@ -96,29 +99,30 @@ export function AppRoutes() {
               </Route>
             </Route>
             <Route path="/" element={<LogInLayout />}>
-              <Route element={<AuthenticatedGate goTo="/auth/login" />}>
-                <Route
-                  path="/"
-                  element={
-                    <StationStartGate>
-                      <PHome />
-                    </StationStartGate>
-                  }
-                />
-                <Route path="station" element={<PStation />} />
-                <Route path="game" element={<PGame />} />
-                <Route path="debug">
-                  <Route index element={<PDebug />} />
+              {!classic && (
+                <Route element={<AuthenticatedGate goTo="/auth/login" />}>
+                  {/* every logged-in route is the ship */}
+                  <Route index element={<GameShell />} />
+                  <Route path="*" element={<GameShell />} />
                 </Route>
-                <Route path="live_scraper" element={<PLiveScraper />} />
-                <Route path="warframe-market" element={<PWarframeMarket />} />
-                <Route path="chat" element={<PWarframeMarketChat />} />
-                <Route path="trading_analytics" element={<TradingAnalyticsPage />} />
-                <Route path="trade_messages" element={<PTradeMessages />} />
-                <Route path="about" element={<AboutPage />} />
-                <Route path="wf_inventory" element={<WfInventoryPage />} />
-              </Route>
-              <Route path="*" element={<PHome />} />
+              )}
+              {classic && (
+                <Route element={<AuthenticatedGate goTo="/auth/login" />}>
+                  <Route path="/" element={<PHome />} />
+                  <Route path="station" element={<PStation />} />
+                  <Route path="debug">
+                    <Route index element={<PDebug />} />
+                  </Route>
+                  <Route path="live_scraper" element={<PLiveScraper />} />
+                  <Route path="warframe-market" element={<PWarframeMarket />} />
+                  <Route path="chat" element={<PWarframeMarketChat />} />
+                  <Route path="trading_analytics" element={<TradingAnalyticsPage />} />
+                  <Route path="trade_messages" element={<PTradeMessages />} />
+                  <Route path="about" element={<AboutPage />} />
+                  <Route path="wf_inventory" element={<WfInventoryPage />} />
+                </Route>
+              )}
+              {classic && <Route path="*" element={<PHome />} />}
             </Route>
           </>
         )}

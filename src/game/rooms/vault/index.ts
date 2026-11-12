@@ -8,6 +8,7 @@ import type { Buyer, GoalSnapshot } from "../../../station/engine/logic";
 import { Customers, DOOR_DEG } from "./customers";
 import { Reservoir } from "./reservoir";
 import { APOTHEM, buildShell, type Shell } from "./shell";
+import { buildServiceDeck, type ServiceDeck } from "./terminals";
 
 /**
  * Room 1, the Vault. Builds the hall, the Plat Reservoir, the Trade Desk with its customers, the
@@ -30,6 +31,8 @@ export class VaultRoom implements Room {
   readonly id = "vault";
   readonly spawn = { x: -1.6, z: 8.4, yaw: -0.16 };
   readonly screens: VaultScreens;
+  /** The Service Deck: one terminal per classic section, and the Bridge Watch (terminals.ts). */
+  readonly deck: ServiceDeck;
   private shell: Shell;
   private reservoir: Reservoir;
   private customers: Customers;
@@ -141,6 +144,7 @@ export class VaultRoom implements Room {
     this.banners();
     this.sculptures();
 
+    this.deck = buildServiceDeck(engine);
     this.screens = { reservoir: reservoirScreen, desk: deskScreen, stock: stockScreen, pa, console: consoleScreen, sign };
     this.lever = this.leverGroup;
     this.setQuality(engine.quality);
@@ -517,6 +521,7 @@ export class VaultRoom implements Room {
   dispose() {
     this.reservoir.dispose();
     this.customers.dispose();
+    this.deck.dispose();
     for (const l of this.labels) l.dispose();
   }
 }

@@ -1,5 +1,5 @@
 import { MantineThemeProvider } from "@mantine/core";
-import { modals } from "@mantine/modals";
+import { modals, useModals } from "@mantine/modals";
 import { notifications } from "@mantine/notifications";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -18,6 +18,9 @@ import { makeAnnouncement, useNotificationCapture, type Announcement } from "./n
 import { ObservatoryRoom } from "./rooms/observatory";
 import { Ship } from "./rooms/ship";
 import { VaultRoom } from "./rooms/vault";
+import { fitScreenToView } from "./rooms/vault/terminals";
+import { fallBackToClassic, isClassic, watchdogMs } from "./shellMode";
+import { ServiceDeck } from "./ui/ServiceDeck";
 import { ConsoleScreen, PAScreen, ReservoirScreen, SignScreen } from "./ui/Ambient";
 import { DeskScreen } from "./ui/DeskScreen";
 import { MarketConsole } from "./ui/MarketConsole";
@@ -25,6 +28,7 @@ import { StockScreen } from "./ui/StockScreen";
 import { useMarket } from "./ui/useMarket";
 import { WeatherScreen } from "./ui/WeatherScreen";
 import "./game.css";
+import "./shell.css";
 
 /**
  * The React side of the game. It owns the engine's lifetime (one engine per mount, disposed on
@@ -46,6 +50,14 @@ interface Live {
 }
 
 const COMMS = "comms";
+/** Dev builds only: a fault to provoke through localStorage, to test the classic fallback (stall | webgl | crash). */
+const testFault = (): string | null => {
+  try {
+    return import.meta.env.DEV ? localStorage.getItem("vt_game_test_fault") : null;
+  } catch {
+    return null;
+  }
+};
 
 export default function GameCore() {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -69,6 +81,17 @@ export default function GameCore() {
   const queueRef = useRef<Buyer[]>([]);
   queueRef.current = queue;
 
+  const firstFrameRef = useRef(false);
+  // dev/test: a render crash on demand (the boundary in GamePage must land in the classic view)
+  const [boom, setBoom] = useState(() => testFault() === "crash");
+  if (boom) throw new Error("test fault: the game crashed");
+  // a dialog the app opened with closeOnEscape off (terms of service, forced update) must be
+  // answered: disengaging the Comms display does not dismiss it
+  const openModals = useModals().modals;
+  const locked = openModals.some((m) => m.props?.closeOnEscape === false);
+  const lockedRef = useRef(locked);
+  lockedRef.current = locked;
+
   const announce = useCallback((a: Announcement) => {
     setAnnouncements((list) => [a, ...list].slice(0, 12));
   }, []);
@@ -80,11 +103,43 @@ export default function GameCore() {
     if (!host) return;
     let engine: Engine;
     try {
+      if (testFault() === "webgl") throw new Error("test fault: no WebGL");
       engine = new Engine(host);
     } catch (e) {
-      console.error("[game] WebGL unavailable", e);
+      // no WebGL context: the ship cannot be drawn, the app opens the classic view instead
+      console.warn("[game] WebGL unavailable", e);
+      fallBackToClassic(`WebGL unavailable: ${e instanceof Error ? e.message : String(e)}`.slice(0, 300));
       return;
     }
+    // --- watchdog: no first frame within the limit (visible time), or a lost context: classic view
+    let frames = 0;
+    let leaving = false;
+    firstFrameRef.current = false;
+    const stall = testFault() === "stall";
+    const offFrames = engine.addSystem(() => {
+      if (stall) return;
+      // the second step proves a whole frame was simulated and drawn
+      if (++frames === 2) firstFrameRef.current = true;
+    });
+    let seen = 0;
+    let lastTick = performance.now();
+    const limit = watchdogMs();
+    const watchdog = window.setInterval(() => {
+      const now = performance.now();
+      if (!document.hidden) seen += now - lastTick;
+      lastTick = now;
+      if (firstFrameRef.current) {
+        window.clearInterval(watchdog);
+        offFrames();
+      } else if (seen > limit) {
+        window.clearInterval(watchdog);
+        fallBackToClassic(`no first frame after ${Math.round(limit / 1000)}s`);
+      }
+    }, 250);
+    const onContextLost = () => {
+      if (!leaving) fallBackToClassic("the graphics context was lost");
+    };
+    engine.renderer.domElement.addEventListener("webglcontextlost", onContextLost);
     const vault = new VaultRoom(engine, {
       onServe: (id) => {
         setSelected(id);
@@ -99,6 +154,8 @@ export default function GameCore() {
     engine.screens.add({ id: COMMS, title: "Comms", px: [980, 700], width: 1.45, position: new THREE.Vector3(0, -50, 0), yaw: 0, dockable: true, reach: 0, fill: 0.86 });
     engine.screens.setHidden(COMMS, true);
     const modals = new ModalRouter(engine, COMMS);
+    modals.locked = lockedRef.current;
+    modals.onShow = () => fitScreenToView(engine, COMMS, [980, 700]);
     const offs = [
       engine.events.on("dock", (id) => {
         setDocked(id);
@@ -136,9 +193,12 @@ export default function GameCore() {
       vault.setQueue(queueRef.current, null);
       setAnnouncements((a) => [...a]);
     });
-    engine.start();
-    if (import.meta.env.DEV) (window as unknown as { __vtGame?: unknown }).__vtGame = devHandle(l, () => marketRef.current);
+    if (testFault() !== "stall") engine.start();
+    if (import.meta.env.DEV) (window as unknown as { __vtGame?: unknown }).__vtGame = devHandle(l, () => marketRef.current, () => firstFrameRef.current, () => setBoom(true));
     return () => {
+      leaving = true;
+      window.clearInterval(watchdog);
+      engine.renderer.domElement.removeEventListener("webglcontextlost", onContextLost);
       for (const off of offs) off();
       modals.dispose(); // puts Mantine's shared portal node back in <body> before the DOM goes
       engine.dispose(); // also releases pointer lock and removes the canvas and the CSS3D layer
@@ -148,6 +208,10 @@ export default function GameCore() {
       if (import.meta.env.DEV) delete (window as unknown as { __vtGame?: unknown }).__vtGame;
     };
   }, [announce]);
+
+  useEffect(() => {
+    if (live) live.modals.locked = locked;
+  }, [live, locked]);
 
   // --- buyers
   const addBuyerRef = useRef<(b: Omit<Buyer, "pings">) => void>(() => {});
@@ -259,19 +323,25 @@ export default function GameCore() {
     liveRef.current?.engine.screens.undock();
   }, [mk.setFocus]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // --- leaving the route: hide and stop at once, even while React still holds the old tree
-  // (a navigation to a lazy route keeps the previous screen until the chunk loads)
+  // --- leaving for the classic view (fallback or key chord): hide and stop at once, even if React
+  // still holds this tree while the classic page's chunk loads
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const start = window.location.pathname;
+    let stopped = false;
     const id = window.setInterval(() => {
-      const away = window.location.pathname !== start;
+      const away = isClassic();
       host.style.visibility = away ? "hidden" : "";
       const e = liveRef.current?.engine;
       if (!e) return;
-      if (away) e.stop();
-      else if (!document.hidden) e.start();
+      if (away && !stopped) {
+        stopped = true;
+        e.stop();
+      } else if (!away && stopped) {
+        // only restart what this stopped (never an engine that is stopped on purpose)
+        stopped = false;
+        if (!document.hidden) e.start();
+      }
     }, 150);
     return () => window.clearInterval(id);
   }, []);
@@ -292,11 +362,11 @@ export default function GameCore() {
 
   // a first line on the PA display
   useEffect(() => {
-    announce(makeAnnouncement("Welcome aboard", "Click to take control · E to engage a screen · V to change camera", "cyan"));
+    announce(makeAnnouncement("Welcome aboard", "Click to take control · E to engage a screen · V to change camera · Service Deck: the terminals along the south windows", "cyan"));
   }, [announce]);
 
   const undock = useCallback(() => liveRef.current?.engine.screens.undock(), []);
-  const onMore = useCallback(() => announce(makeAnnouncement("Stock desk", "Market info: the Market Observatory, north through the arch. Bulk edit: Live Trading in the app.", "cyan")), [announce]);
+  const onMore = useCallback(() => announce(makeAnnouncement("Stock desk", "Market info: the Market Observatory, north through the arch. Bulk edit: the Trade Engine on the Service Deck.", "cyan")), [announce]);
 
   const portals = useMemo(() => {
     if (!live) return null;
@@ -353,6 +423,7 @@ export default function GameCore() {
   return (
     <div ref={hostRef} className="vtg-host" data-vtg-host>
       {portals}
+      {live && <ServiceDeck deck={live.vault.deck} docked={docked} commsId={COMMS} announcements={announcements} onDisengage={undock} />}
     </div>
   );
 }
@@ -361,7 +432,7 @@ export default function GameCore() {
  * Dev-only handle for tests and the console (`window.__vtGame`): the engine and rooms, plus
  * helpers to move the player, aim at things and drive the observatory.
  */
-function devHandle(l: Live, market: () => ReturnType<typeof useMarket>) {
+function devHandle(l: Live, market: () => ReturnType<typeof useMarket>, firstFrame: () => boolean, crash: () => void) {
   const { engine, ship, observatory } = l;
   const aimAt = (target: THREE.Vector3) => {
     const eye = engine.player.eye(new THREE.Vector3());
@@ -371,6 +442,21 @@ function devHandle(l: Live, market: () => ReturnType<typeof useMarket>) {
   };
   return {
     ...l,
+    /** True once the engine has drawn its first frame (the watchdog's condition). */
+    get firstFrame() {
+      return firstFrame();
+    },
+    /** Throw inside the game's React tree (tests the crash fallback to the classic view). */
+    crash,
+    deck: l.vault.deck,
+    /** Stand in front of a Service Deck terminal and aim at it. */
+    goToTerminal: (id: Parameters<Live["vault"]["deck"]["standAt"]>[0]) => {
+      const at = l.vault.deck.standAt(id);
+      if (!at) return false;
+      engine.player.place(at.x, at.z, at.yaw);
+      aimAt(new THREE.Vector3(...at.aim));
+      return true;
+    },
     get where() {
       return ship.where;
     },

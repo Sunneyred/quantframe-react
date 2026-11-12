@@ -636,7 +636,7 @@
   });
 
   state.alerts = [
-    { id: hex(24), created_at: iso(NOW - 2 * DAY), updated_at: iso(NOW - 2 * DAY), type: "info", context: "Mock alert: Void Trader 1.12 is out. Read the notes.", enabled: true, properties: { link: "https://example.invalid/notes" } },
+    { id: hex(24), created_at: iso(NOW - 2 * DAY), updated_at: iso(NOW - 2 * DAY), type: "info", context: "Mock alert: Void Trader 1.12 is out. Read the notes.", enabled: true, properties: { event: "open_url", payload: "https://example.invalid/notes" } },
     { id: hex(24), created_at: iso(NOW - DAY), updated_at: iso(NOW - DAY), type: "warning", context: "Mock alert: warframe.market maintenance on Friday.", enabled: true, properties: null },
   ];
   if (!OPTIONS.alerts) state.alerts = [];

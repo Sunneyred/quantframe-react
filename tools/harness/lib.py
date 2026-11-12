@@ -130,6 +130,8 @@ class Suite:
         self.errors: list[str] = []
         self.counter = 0
         self.session_reports: list[dict] = []
+        # localStorage every session starts with (a scenario's own `storage` wins)
+        self.default_storage: dict = {}
         shots.mkdir(parents=True, exist_ok=True)
 
     # --- sessions -------------------------------------------------------------------------
@@ -139,6 +141,7 @@ class Suite:
         ctx = self.browser.new_context(viewport={"width": width, "height": height}, device_scale_factor=1)
         ctx.grant_permissions(["clipboard-read", "clipboard-write"])
         ctx.add_init_script(mock_script(options or {}))
+        storage = {**self.default_storage, **(storage or {})}
         if storage:
             ctx.add_init_script("(() => { const s = %s; for (const k in s) { if (localStorage.getItem('__harness_seeded_' + k) === null) { localStorage.setItem(k, s[k]); localStorage.setItem('__harness_seeded_' + k, '1'); } } })();" % json.dumps(storage))
 

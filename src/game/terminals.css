@@ -1,0 +1,186 @@
+/* Service Deck terminals and the Bridge Watch (rooms/vault/terminals.ts, ui/ServiceDeck.tsx).
+   Layout only: the terminal chrome is the shared Frame, styled in game.css. */
+
+/* --- idle face: light, static, sized from the screen so it reads at any DOM resolution --- */
+.vtg-term-idle {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.2cqh;
+  padding: 4cqh 6cqw;
+  text-align: center;
+  container-type: size;
+}
+.vtg-term-idle-title {
+  font-size: 9cqw;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.vtg-term-idle-sub {
+  font-size: 3.4cqw;
+}
+.vtg-term-idle-what {
+  font-size: 3cqw;
+  max-width: 86cqw;
+  line-height: 1.25;
+}
+.vtg-term-wait,
+.vtg-term-fault {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  text-align: center;
+  padding: 24px;
+  font-size: 20px;
+}
+.vtg-term-note {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70%;
+  font-weight: 600;
+}
+
+/* --- the embedded classic page --- */
+.vtg-term-page {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  overflow: auto;
+  background: var(--mantine-color-body);
+  color: var(--mantine-color-text);
+  font-family: var(--mantine-font-family);
+  font-size: var(--mantine-font-size-md);
+  line-height: var(--mantine-line-height);
+  /* The app's pages size their tables as "window height minus what is above them", which includes
+     the 65px app header. Here the room they have is this box (same trick as the station's panels). */
+  container-type: size;
+  --vt-vh: calc(100cqh + 65px);
+}
+/* a page's own dropdowns, tooltips and inline dialogs are portalled to the screen content */
+.vtg-screen.vtg-term .vtg-screen-content > [data-portal] {
+  color: var(--mantine-color-text);
+  font-family: var(--mantine-font-family);
+  font-size: var(--mantine-font-size-md);
+  line-height: var(--mantine-line-height);
+}
+/* scroll containers are compositing layers: an idle terminal has none */
+.vtg-screen.vtg-term:not(.is-docked) .vtg-term-page {
+  overflow: hidden;
+}
+
+/* The embedded pages are the classic pages, unchanged: the terminal-control restyle that game.css
+   applies to Mantine controls on native screens does not apply inside a terminal (the pages'
+   layouts are built for the app theme's control sizes). */
+.vtg-screen.vtg-term .mantine-Button-root {
+  font-family: var(--mantine-font-family);
+  letter-spacing: normal;
+  text-transform: none;
+  border-radius: var(--button-radius, var(--mantine-radius-default));
+}
+.vtg-screen.vtg-term .mantine-Input-input,
+.vtg-screen.vtg-term .mantine-NumberInput-input {
+  border-radius: var(--input-radius);
+  background: var(--input-bg);
+  border-color: var(--input-bd);
+  color: var(--input-color);
+  font-family: var(--input-font-family, var(--mantine-font-family));
+  font-size: var(--input-fz);
+}
+.vtg-screen.vtg-term .mantine-InputWrapper-label {
+  font-family: var(--mantine-font-family);
+  font-size: var(--input-label-size, var(--mantine-font-size-sm));
+  letter-spacing: normal;
+  text-transform: none;
+  color: inherit;
+}
+.vtg-screen.vtg-term .mantine-SegmentedControl-root {
+  border-radius: var(--sc-radius, var(--mantine-radius-default));
+  background: var(--mantine-color-dark-8);
+  border: 0;
+}
+.vtg-screen.vtg-term .mantine-SegmentedControl-indicator {
+  border-radius: var(--sc-radius, var(--mantine-radius-default));
+  background: var(--sc-color, var(--mantine-color-dark-5));
+}
+.vtg-screen.vtg-term .mantine-Alert-root {
+  border-radius: var(--alert-radius, var(--mantine-radius-default));
+}
+.vtg-screen.vtg-term .mantine-Badge-root {
+  border-radius: var(--badge-radius, 1000rem);
+  font-family: var(--mantine-font-family);
+  letter-spacing: 0.25px;
+}
+
+/* dialogs on a screen: never taller than the screen (Mantine sizes them from the window) */
+.vtg-screen .mantine-Modal-inner {
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+.vtg-screen .mantine-Modal-content {
+  max-height: calc(var(--vtg-h, 700px) - 32px);
+}
+
+/* --- Bridge Watch --- */
+.vtg-watch {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 26px;
+  padding: 14px 22px;
+  align-items: stretch;
+}
+.vtg-watch-clock {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding-right: 26px;
+  border-right: 1px solid rgba(42, 212, 230, 0.25);
+  font-family: Orbitron, sans-serif;
+  color: #ffe39a;
+}
+.vtg-watch-clock .mantine-Text-root {
+  font-size: 38px;
+  font-family: Orbitron, sans-serif;
+  white-space: nowrap;
+}
+.vtg-watch-alerts {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+}
+.vtg-screen.is-docked .vtg-watch-alerts {
+  overflow-y: auto;
+}
+.vtg-watch-alert {
+  font-size: 26px;
+  line-height: 1.2;
+  padding: 4px 10px;
+  border-left: 2px solid currentColor;
+  background: rgba(42, 212, 230, 0.05);
+}
+.vtg-watch-alert[data-clickable] {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.35);
+}
+.vtg-watch-alert[data-clickable]:hover {
+  background: rgba(42, 212, 230, 0.14);
+}
+
+/* The shared screen bezel is bevelled over the glass, and a docked terminal is seen from very close
+   (it nearly fills the view), so the outermost strip of the DOM sits under the bezel: keep the
+   terminal's frame clear of it. */
+.vtg-screen.vtg-term[data-screen^="svc-"]:not([data-screen="svc-watch"]) .vtg-frame {
+  inset: 3.4% 2.6%;
+}
