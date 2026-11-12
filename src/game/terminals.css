@@ -119,11 +119,11 @@
 
 /* dialogs on a screen: never taller than the screen (Mantine sizes them from the window) */
 .vtg-screen .mantine-Modal-inner {
-  padding-top: 16px;
-  padding-bottom: 16px;
+  padding-top: 36px;
+  padding-bottom: 36px;
 }
 .vtg-screen .mantine-Modal-content {
-  max-height: calc(var(--vtg-h, 700px) - 32px);
+  max-height: calc(var(--vtg-h, 700px) - 72px);
 }
 
 /* --- Bridge Watch --- */

@@ -43,6 +43,11 @@ ZERO_UI_JS = r"""
 }
 """
 
+# A control that opens a dialog: click it and let the game run for a second, as it does in the app
+# (the dialog lands on the Comms display, which only a drawn frame brings into view; with the engine
+# stopped and no frame, headless Chromium has crashed here).
+OPEN_JS = "(el) => { el.click(); const e = window.__vtGame.engine; let n = 0; const id = setInterval(() => { try { e.step(0.05); } catch (x) { clearInterval(id); } if (++n >= 24) clearInterval(id); }, 40); }"
+
 RECT_JS = "(sel) => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, r: r.right, b: r.bottom }; }"
 
 
@@ -158,8 +163,11 @@ def floats_near(s, h, tid: str, float_sel: str, ref_sel: str, what: str) -> None
 
 def on_comms(s, h, what: str) -> None:
     pg = s.page
-    pg.wait_for_selector(".mantine-Modal-content", state="attached", timeout=60000)
+    # the router takes the dialog as soon as Mantine mounts it; draw the display so it can open
+    pg.wait_for_function("() => window.__vtGame && window.__vtGame.modals.isOpen", timeout=60000, polling=250)
     settle(h, pg)
+    pg.wait_for_selector(".mantine-Modal-content", state="attached", timeout=60000)
+    settle(h, pg, 4)
     s.check(h.V(pg, "g.modals.isOpen") is True, f"{what}: the modal router did not take the dialog")
     s.check(pg.evaluate("() => !!document.querySelector('[data-screen=comms] .mantine-Modal-content')"), f"{what}: the dialog is not inside the Comms display")
     s.check(docked_id(h, pg) == "comms", f"{what}: Comms is not engaged (docked: {docked_id(h, pg)})")
@@ -230,7 +238,7 @@ def part_boot(s, h) -> None:
         settle(h, pg)
         s.check(docked_id(h, pg) == "svc-watch", "E did not engage the Bridge Watch")
         zero_ui(s, "watch docked", docked=True)
-        pg.locator("[data-vtg-alert][data-clickable]").first.click(timeout=30000)
+        pg.locator("[data-vtg-alert][data-clickable]").first.click(timeout=30000, no_wait_after=True)
         pg.wait_for_function("() => window.__HARNESS__.calls.some((c) => c.cmd === 'plugin:shell|open')", timeout=15000)
         opened = h.calls(pg, "plugin:shell|open")
         s.check("example.invalid/notes" in str(opened[-1]["args"]), f"alert link opened {opened[-1]['args']}")
@@ -239,12 +247,18 @@ def part_boot(s, h) -> None:
         s.check(not h.V(pg, "g.engine.screens.busy"), "Esc did not disengage the Bridge Watch")
 
 
+def fresh(s, h):
+    """A new session in the ship. The software-rendered page grows by hundreds of megabytes with
+    every heavy page it has shown, and the machine's memory is shared with other runs: a few
+    terminals per session keep the renderer from being killed."""
+    with s.step("shell: a fresh session in the ship", shot=False):
+        pg = s.open(*h.DEFAULT_WINDOW, storage=h.SHIP)
+        h.wait_game(s)
+    return pg
+
+
 def part_terminals(s, h) -> None:
-    pg = s.page
-    if pg is None or not pg.evaluate("() => !!window.__vtGame"):
-        with s.step("shell: boot for the terminals", shot=False):
-            pg = s.open(*h.DEFAULT_WINDOW, storage=h.SHIP)
-            h.wait_game(s)
+    pg = fresh(s, h)
     H, calls, text_visible = h.H, h.calls, h.text_visible
 
     # --- Trade Engine: the Live Trading page, with the trader start/stop and the strategy panel
@@ -257,24 +271,24 @@ def part_terminals(s, h) -> None:
         h.layout(s, scope, "Trade Engine")
     with s.step("shell: Trade Engine starts the live trader; the confirmation is asked on the Comms display"):
         pg.evaluate("() => { document.querySelector('[data-vtg-term-page=live]').dataset.mark = 'kept'; }")
-        pg.locator(scope).get_by_role("button", name="Start", exact=False).first.click(timeout=30000)
+        pg.locator(scope).get_by_role("button", name="Start", exact=False).first.evaluate(OPEN_JS)
         on_comms(s, h, "start confirmation")
         s.check(H(pg, "h.state.running") is False, "the trader started before the confirmation")
         s.check(pg.locator("[data-vtg-term-page=live]").count() == 1, "the page was unmounted while its dialog is open")
         zero_ui(s, "confirmation on Comms", docked=True)
     with s.step("shell: confirming starts the trader and returns to the terminal, page intact"):
-        pg.locator(".mantine-Modal-content").get_by_role("button", name="Start", exact=False).first.click(timeout=30000)
+        pg.locator(".mantine-Modal-content").get_by_role("button", name="Start", exact=False).first.click(timeout=30000, no_wait_after=True)
         comms_closed(s, h, "start confirmation", "svc-live")
         pg.wait_for_function("() => window.__HARNESS__.state.running === true", timeout=15000)
         s.check(pg.evaluate("() => document.querySelector('[data-vtg-term-page=live]')?.dataset.mark") == "kept", "the page was remounted by its own dialog")
         s.check(text_visible(pg, scope, "Stop", timeout=20000), "the page does not show the trader running")
-        pg.locator(scope).get_by_role("button", name="Stop", exact=False).first.click(timeout=30000)
+        pg.locator(scope).get_by_role("button", name="Stop", exact=False).first.click(timeout=30000, no_wait_after=True)
         pg.wait_for_function("() => window.__HARNESS__.state.running === false", timeout=15000)
     with s.step("shell: Trade Engine strategy: pick a preset"):
-        pg.locator(scope).get_by_role("button", name="Show presets and activity").click(timeout=30000)
-        pg.locator(f"{scope} button[aria-pressed]", has_text="Flipper").click(timeout=30000)
+        pg.locator(scope).get_by_role("button", name="Show presets and activity").click(timeout=30000, no_wait_after=True)
+        pg.locator(f"{scope} button[aria-pressed]", has_text="Flipper").click(timeout=30000, no_wait_after=True)
         pg.wait_for_function("() => window.__HARNESS__.state.settings.live_scraper.void_trader.preset === 'flipper'", timeout=15000)
-        pg.locator(scope).get_by_role("button", name="Hide presets", exact=False).first.click(timeout=30000)
+        pg.locator(scope).get_by_role("button", name="Hide presets", exact=False).first.click(timeout=30000, no_wait_after=True)
     with s.step("shell: Trade Engine: a tooltip and a dropdown open on the docked screen, at their controls"):
         row = pg.locator(f"{scope} tbody tr", has_text="Nova Prime Set").first
         actions = row.locator("td").last.locator("button")
@@ -286,22 +300,27 @@ def part_terminals(s, h) -> None:
         pg.wait_for_timeout(400)
         sel = pg.locator(f"{scope} input[placeholder='Select item...']").first
         sel.evaluate("(el) => el.setAttribute('data-harness-ref', 'select')")
-        sel.click(timeout=30000)
+        sel.click(timeout=30000, no_wait_after=True)
         floats_near(s, h, "live", "[role=listbox]:visible, .mantine-Select-dropdown:visible, .mantine-Combobox-dropdown:visible", "[data-harness-ref=select]", "item select dropdown")
     with s.step("shell: Trade Engine: an option picked from the dropdown lands in the field"):
         opt = pg.locator("[role=option]:visible").first
         name = opt.inner_text().strip().split("\n")[0]
-        opt.click(timeout=30000)
+        opt.click(timeout=30000, no_wait_after=True)
         pg.wait_for_timeout(500)
         s.check(name and name.lower() in (sel.input_value() or "").lower(), f"picked '{name}', the field shows '{sel.input_value()}'")
+    pg = fresh(s, h)
     with s.step("shell: Trade Engine: a row's sell dialog opens on Comms and the sale reaches the backend"):
+        scope = engage(s, h, "live")
+        s.check(text_visible(pg, scope, "Nova Prime Set", timeout=60000), "stock items missing")
+        row = pg.locator(f"{scope} tbody tr", has_text="Nova Prime Set").first
+        actions = row.locator("td").last.locator("button")
         before = len(calls(pg, "stock_item_sell"))
-        actions.first.click(timeout=30000)
+        actions.first.evaluate(OPEN_JS)
         on_comms(s, h, "sell dialog")
         fields = pg.locator(".mantine-Modal-content input:not([type=hidden])")
         fields.nth(0).fill("1")
         fields.nth(1).fill("77")
-        pg.locator(".mantine-Modal-content").get_by_role("button", name="Confirm", exact=False).first.click(timeout=30000)
+        pg.locator(".mantine-Modal-content").get_by_role("button", name="Confirm", exact=False).first.click(timeout=30000, no_wait_after=True)
         comms_closed(s, h, "sell dialog", "svc-live")
         pg.wait_for_function("(n) => window.__HARNESS__.calls.filter((c) => c.cmd === 'stock_item_sell').length > n", arg=before, timeout=15000)
         sold = calls(pg, "stock_item_sell")[-1]
@@ -321,7 +340,9 @@ def part_terminals(s, h) -> None:
         ("home", "Overview", "Total Profit", ("text", "Sale"), "Last Transaction", None),
         ("debug", "Maintenance Hatch", "Add Log", ("tab", "States"), "WFM State", None),
     ]
-    for tid, name, proof, control, after, cmd in table:
+    for i, (tid, name, proof, control, after, cmd) in enumerate(table):
+        if i % 3 == 2:
+            pg = fresh(s, h)
         with s.step(f"shell: {name} docks, shows the real page, and a control round-trips"):
             n0 = H(pg, "h.calls.length")
             scope = engage(s, h, tid)
@@ -330,9 +351,9 @@ def part_terminals(s, h) -> None:
             on_screen(s, h, tid, name)
             kind, what = control
             if kind == "tab":
-                pg.locator(scope).get_by_role("tab", name=what, exact=False).first.click(timeout=30000)
+                pg.locator(scope).get_by_role("tab", name=what, exact=False).first.click(timeout=30000, no_wait_after=True)
             else:
-                pg.locator(scope).get_by_text(what, exact=False).first.click(timeout=30000)
+                pg.locator(scope).get_by_text(what, exact=False).first.click(timeout=30000, no_wait_after=True)
             s.check(text_visible(pg, scope, after, timeout=30000), f"using '{what}' did not work (expected '{after}')")
             s.check(H(pg, "h.calls.length") > n0, "no backend command was called from the terminal")
             if cmd:
@@ -341,29 +362,30 @@ def part_terminals(s, h) -> None:
             h.layout(s, scope, name)
             if tid == "analytics":
                 # a date picker on the docked screen: opens at its button and picks a range
-                pg.locator(scope).get_by_role("tab", name="Item", exact=False).first.click(timeout=30000)
+                pg.locator(scope).get_by_role("tab", name="Item", exact=False).first.click(timeout=30000, no_wait_after=True)
                 pg.wait_for_timeout(500)
                 btn = pg.locator(f"{scope} button", has_text="Select date range").first
                 btn.evaluate("(el) => el.setAttribute('data-harness-ref', 'dates')")
-                btn.click(timeout=30000)
+                btn.click(timeout=30000, no_wait_after=True)
                 floats_near(s, h, tid, ".mantine-Popover-dropdown:visible", "[data-harness-ref=dates]", "date picker")
                 days = pg.locator(".mantine-Popover-dropdown .mantine-DatePickerInput-day:not([data-outside]):not([disabled])")
-                days.nth(1).click(timeout=30000)
-                days.nth(8).click(timeout=30000)
+                days.nth(1).click(timeout=30000, no_wait_after=True)
+                days.nth(8).click(timeout=30000, no_wait_after=True)
                 pg.wait_for_timeout(800)
-                s.check("Select date range" not in btn.inner_text(), "the picked range did not land in the field")
+                s.check("Select date range" not in pg.locator("[data-harness-ref=dates]").inner_text(), "the picked range did not land in the field")
                 pg.keyboard.press("Escape")  # closes the picker (and disengages if it was already closed)
                 pg.wait_for_timeout(300)
                 if docked_id(h, pg) is None:
                     settle(h, pg)
             disengage(s, h, tid)
 
+    pg = fresh(s, h)
     with s.step("shell: Ship's Registry (About): check for updates answers on the terminal", allow=[r"plugin:process"]):
         scope = engage(s, h, "about")
         s.check(text_visible(pg, scope, "Check for Updates", timeout=60000), "About page missing")
         s.check(text_visible(pg, scope, "Version"), "version missing")
         n0 = len(calls(pg, "plugin:updater|check"))
-        pg.locator(scope).get_by_role("button", name="Check for Updates", exact=False).first.click(timeout=30000)
+        pg.locator(scope).get_by_role("button", name="Check for Updates", exact=False).first.click(timeout=30000, no_wait_after=True)
         pg.wait_for_function("(n) => window.__HARNESS__.calls.filter((c) => c.cmd === 'plugin:updater|check').length > n", arg=n0, timeout=15000)
         pg.wait_for_function("() => [...document.querySelectorAll('[data-vtg-term-note]')].some((n) => /no updates/i.test(n.textContent))", timeout=15000)
         zero_ui(s, "About docked with its toast", docked=True)
@@ -372,16 +394,20 @@ def part_terminals(s, h) -> None:
     with s.step("shell: Engineering (settings): every tab is there; a change is saved through the backend"):
         scope = engage(s, h, "settings")
         s.check(text_visible(pg, scope, "Live Scraper", timeout=60000), "settings form missing")
-        pg.locator(f"{scope} [role=tab]", has_text="Notifications").first.click(timeout=30000)
+        pg.locator(f"{scope} [role=tab]", has_text="Notifications").first.click(timeout=30000, no_wait_after=True)
         s.check(text_visible(pg, scope, "Conversation"), "notification settings missing")
         on_screen(s, h, "settings", "Engineering")
         before = len(calls(pg, "app_update_settings"))
         was = H(pg, "h.state.settings.live_scraper.general.report_to_wfm")
         h.change_a_setting(pg, scope)
-        pg.locator(scope).get_by_role("button", name="Save", exact=False).last.click(timeout=30000)
+        pg.locator(scope).get_by_role("button", name="Save", exact=False).last.click(timeout=30000, no_wait_after=True)
         pg.wait_for_function("(n) => window.__HARNESS__.calls.filter((c) => c.cmd === 'app_update_settings').length > n", arg=before, timeout=15000)
         s.check(H(pg, "h.state.settings.live_scraper.general.report_to_wfm") is (not was), "the changed setting did not reach the backend")
         s.check("error" not in calls(pg, "app_update_settings")[-1], "the backend would reject the settings")
+        try:
+            pg.wait_for_function("() => !window.__vtGame.engine.screens.docked", timeout=15000, polling=250)
+        except Exception:  # noqa: BLE001
+            pass
         settle(h, pg)
         s.check(not h.V(pg, "g.engine.screens.busy"), "the terminal did not disengage after saving")
         pg.wait_for_function("() => /settings/i.test((document.querySelector('[data-vtg-pa-latest]') || {}).textContent || '')", timeout=15000)
@@ -390,15 +416,15 @@ def part_terminals(s, h) -> None:
         scope = engage(s, h, "account")
         s.check(text_visible(pg, scope, "VoidTraderTester", timeout=60000), "account name missing")
         before = len(calls(pg, "user_set_status"))
-        pg.locator("[data-vtg-account] [data-user-status='online']").click(timeout=30000)
+        pg.locator("[data-vtg-account] [data-user-status='online']").click(timeout=30000, no_wait_after=True)
         pg.wait_for_function("(n) => window.__HARNESS__.calls.filter((c) => c.cmd === 'user_set_status').length > n", arg=before, timeout=15000)
         s.check("online" in str(calls(pg, "user_set_status")[-1]["args"]), "status not sent")
         zero_ui(s, "Captain's Console docked", docked=True)
     with s.step("shell: Captain's Console: log out asks on Comms, then shows the login page"):
-        pg.locator("[data-vtg-logout]").click(timeout=30000)
+        pg.locator("[data-vtg-logout]").evaluate(OPEN_JS)
         on_comms(s, h, "log out confirmation")
         s.check(H(pg, "h.state.user.anonymous") is False, "logged out before confirming")
-        pg.locator(".mantine-Modal-content").get_by_role("button", name="Yes").click(timeout=30000)
+        pg.locator(".mantine-Modal-content").get_by_role("button", name="Yes").click(timeout=30000, no_wait_after=True)
         pg.wait_for_function("() => location.pathname === '/auth/login'", timeout=30000)
         s.check(len(calls(pg, "auth_logout")) == 1, "auth_logout not called")
         pg.wait_for_selector("input[type=password]", timeout=30000)
@@ -424,7 +450,7 @@ def part_dialogs(s, h) -> None:
         if box.count():
             box.evaluate("(el) => { el.scrollTop = el.scrollHeight; el.dispatchEvent(new Event('scroll')); }")
             pg.wait_for_timeout(400)
-        pg.locator(".mantine-Modal-content button").last.click(timeout=30000)
+        pg.locator(".mantine-Modal-content button").last.click(timeout=30000, no_wait_after=True)
         pg.wait_for_function("() => window.__HARNESS__.calls.some((c) => c.cmd === 'app_accept_tos' || c.cmd === 'app_exit')", timeout=15000)
         s.check(len(h.calls(pg, "app_accept_tos")) == 1, "accepting did not reach the backend")
         comms_closed(s, h, "terms of service", None)

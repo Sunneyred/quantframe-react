@@ -155,7 +155,8 @@ def wait_game(s: Suite, timeout: int = 180000) -> None:
     pg = s.page
     pg.set_default_timeout(60000)
     pg.wait_for_function("() => window.__vtGame && window.__vtGame.firstFrame", timeout=timeout)
-    pg.wait_for_selector("[class*=splashScreen]", state="detached", timeout=30000)
+    pg.evaluate("() => window.__vtGame.engine.stop()")  # at once: the splash fade needs the frames
+    pg.wait_for_selector("[class*=splashScreen]", state="detached", timeout=90000)
     pg.evaluate("() => window.__vtGame.engine.stop()")
     # The real game requests a frame every tick. With the engine stopped nothing does, and headless
     # Chromium then delivers the frames that Mantine's transitions (dialogs, popovers) wait for only
