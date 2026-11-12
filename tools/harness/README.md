@@ -55,16 +55,17 @@ answered with a 1x1 PNG) and counted.
 
 | name | what |
 | --- | --- |
-| `boot` | start in the station / on Home, late backend start, login, terms of service, update dialog |
+| `boot` | start in the ship (the 3D game) with no app frame, deep link, classic fallback remembered, late backend start, login, terms of service and update dialog in the classic view |
 | `classic` | every classic route at 1280x800 through the side menu, with their tabs, the strategy panel, the settings dialog, backend events |
 | `offline` | no inventory source: typed-in plat, AlecaFrame connect flow, the error when the file is missing |
 | `station` | the station top-down: rooms, map travel to every entry, every terminal with the real page inside, lever, manager, docks, cards (sell, edit, hide, delete, bought, list for sale), stock list, palette, help, buyers from chat and whisper events, sales from trade events, classic view and back |
 | `fp` | the same in first person |
 | `remount` | leaving and re-entering the station several times: canvases and listeners must not pile up |
-| `safety` | a page crashing inside a panel is contained; a crash of the station itself shows the way out, turns "open in the station" off and the app then opens in the classic view |
+| `safety` | the ship: a page crashing inside a Service Deck terminal is contained; no WebGL, no first frame and a game crash each open the classic view with trades reachable. The old station: a page crashing inside a panel is contained; a crash of the station itself shows the way out, turns "open in the station" off and the app then opens in the classic view |
 | `layout` | the classic routes and every station panel, card and overlay at the app's default window size (read from `src-tauri/tauri.conf.json`) |
 | `small` | every station panel, card and overlay at 1280x800, with no alert showing (pages use different offsets then) |
-| `game` | the 3D game (`/game`): walk from the Vault into the Market Observatory, focus a star with E, order book on the spire, an undercut, the Market Console (search, filters, stock card), an app modal routed onto the Comms display, third person, leaving for a lazy route |
+| `game` | the 3D game: walk from the Vault into the Market Observatory, focus a star with E, order book on the spire, an undercut, the Market Console (search, filters, stock card), an app modal routed onto the Comms display, third person, leaving for the classic view with the key chord |
+| `shell` | the app is only the game (`scenarios_shell.py`): nothing in screen space but the reticle, toasts in the world, every Service Deck terminal docks with its real page and a real action through the mock, tooltip / dropdown / date picker / dialogs on a docked screen, Bridge Watch, terms and update dialogs on the Comms display, crash fallback, key chord, "Return to the ship" (`SHELL_PARTS=boot,terminals,consoles,dialogs,fallback` runs some parts) |
 | `dist` | builds the production bundle (`pnpm build`) and runs a smoke pass on it: boot, routes, rooms, every terminal, lever, a sale, events (`--skip-build` uses the existing `dist/`) |
 
 All but `dist` run on the Vite dev server, where the station exposes its game object
@@ -76,7 +77,7 @@ All but `dist` run on the Vite dev server, where the station exposes its game ob
 
 The mock is independent of the scenarios. To test new screens:
 
-- Open a session with `Suite.open(width, height, options=..., storage=..., path="/game")` from
+- Open a session with `Suite.open(width, height, options=..., storage=SHIP)` from
   `lib.py` (see `run.py` for examples). Everything the page calls through `@tauri-apps/api` is
   answered by the mock, and every call is recorded.
 - `options` (passed to the mock): `loggedIn`, `tosAccepted`, `updateAvailable`, `started`
@@ -113,3 +114,13 @@ WebView2 on Windows, the harness in Chromium), pointer lock in first person, GPU
 sound output, the installer and the updater. The contract check covers argument names and
 primitive types, not the fields inside struct arguments or the returned data: the mock's data
 was written by reading the Rust structs, it is not generated from them.
+
+## Ship or classic view
+
+The logged-in app is the 3D game; the classic view is its hidden fallback (`src/game/shellMode.ts`). Every
+session starts with `Suite.default_storage` (`CLASSIC` in `run.py`), so the classic-route and station scenarios
+run in the fallback; a scenario that wants the game passes `storage=SHIP` (low quality, a long watchdog) and
+calls `wait_game(s)`, which waits for the first frame, stops the engine and starts an empty animation-frame
+loop (with nothing requesting frames, headless Chromium starves Mantine's transitions). The game is then
+stepped with `game_steps`. The old 2D station is reached with `enter_station(s)` (classic side bar).
+Software WebGL is slow and memory-hungry: `shell` opens a fresh session every few terminals.

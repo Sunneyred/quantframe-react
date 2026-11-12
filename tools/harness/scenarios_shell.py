@@ -52,7 +52,10 @@ RECT_JS = "(sel) => { const el = document.querySelector(sel); if (!el) return nu
 
 
 def zero_ui(s, where: str, docked: bool = False) -> None:
-    s.page.wait_for_timeout(450)  # the reticle fades over 0.25 s
+    try:  # the reticle fades over 0.25 s, in frames that software rendering delivers slowly
+        s.page.wait_for_function("(d) => { const r = document.querySelector('.vtg-reticle'); return r && (Number(getComputedStyle(r).opacity) === 0) === d; }", arg=docked, timeout=15000, polling=200)
+    except Exception:  # noqa: BLE001
+        pass
     res = s.page.evaluate(ZERO_UI_JS)
     if res.get("error"):
         s.check(False, f"{where}: {res['error']}")
@@ -76,6 +79,8 @@ def scenario_shell(s, h) -> None:
         part_boot(s, h)
     if "terminals" in parts:
         part_terminals(s, h)
+    if "consoles" in parts:  # the last third of "terminals", on its own
+        part_consoles(s, h, fresh(s, h))
     if "dialogs" in parts:
         part_dialogs(s, h)
     if "fallback" in parts:
@@ -379,7 +384,11 @@ def part_terminals(s, h) -> None:
                     settle(h, pg)
             disengage(s, h, tid)
 
-    pg = fresh(s, h)
+    part_consoles(s, h, fresh(s, h))
+
+
+def part_consoles(s, h, pg) -> None:
+    H, calls, text_visible = h.H, h.calls, h.text_visible
     with s.step("shell: Ship's Registry (About): check for updates answers on the terminal", allow=[r"plugin:process"]):
         scope = engage(s, h, "about")
         s.check(text_visible(pg, scope, "Check for Updates", timeout=60000), "About page missing")
@@ -424,8 +433,10 @@ def part_terminals(s, h) -> None:
         pg.locator("[data-vtg-logout]").evaluate(OPEN_JS)
         on_comms(s, h, "log out confirmation")
         s.check(H(pg, "h.state.user.anonymous") is False, "logged out before confirming")
-        pg.locator(".mantine-Modal-content").get_by_role("button", name="Yes").click(timeout=30000, no_wait_after=True)
-        pg.wait_for_function("() => location.pathname === '/auth/login'", timeout=30000)
+        # (a real mouse click on a dialog button is proven by the start and sell dialogs above; here
+        # Playwright's click intermittently never returns, with the game unmounting under it)
+        pg.locator(".mantine-Modal-content").get_by_role("button", name="Yes").evaluate("(el) => el.click()")
+        pg.wait_for_function("() => location.pathname === '/auth/login'", timeout=60000)
         s.check(len(calls(pg, "auth_logout")) == 1, "auth_logout not called")
         pg.wait_for_selector("input[type=password]", timeout=30000)
         s.check(pg.locator("[data-vtg-host]").count() == 0, "the game is still mounted after logging out")

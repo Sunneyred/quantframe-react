@@ -1631,7 +1631,7 @@ def scenario_safety(s: Suite) -> None:
             s.check("Unexpected Application Error" not in pg.evaluate("() => document.body.innerText"), "router error page")
             close_notifications(pg)
             nav(s, "live_scraper")
-            s.check(text_visible(pg, ".mantine-AppShell-main", "Glaive Prime Set"), "trades not reachable in the fallback")
+            s.check(text_visible(pg, ".mantine-AppShell-main", "Glaive Prime Set", timeout=40000), "trades not reachable in the fallback")
     with s.step("safety: a page that crashes inside a panel does not take the station down", allow=crash):
         pg = s.open(1280, 800, options={"corrupt": "orders"})
         enter_station(s)

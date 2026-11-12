@@ -1,7 +1,51 @@
 # Void Trader, the game (phase 2: the Vault and the Market Observatory)
 
-Route `game` inside the app (`GamePage.tsx`, lazy chunk), or standalone on demo data at
-`/src/game/dev.html` on the Vite dev server.
+The game IS the logged-in app: every logged-in route renders it (`GameShell.tsx` -> `GamePage.tsx`, lazy
+chunk) and nothing else is on screen. Standalone on demo data at `/src/game/dev.html` on the Vite dev server.
+What each app function became in the world: `COVERAGE.md`.
+
+## The world-only shell
+
+- `components/Layouts/Routes.tsx`: while `useClassicMode()` is false (the default) the logged-in routes are
+  one index route and one `*` route, both `<GameShell />`; `LogInLayout` then renders only the outlet: no
+  AppShell, header, side bar or alert ticker exist. Login, error, banned and splash are unchanged.
+- Screen space holds only `.vtg-reticle` (hidden while a screen is engaged). Toasts are captured (`notify.ts`)
+  and shown on the PA display, the ticker ring and the foot of the engaged terminal; dialogs go to the Comms
+  display (`modalRouter.ts`); the header's clock and alerts are the Bridge Watch; every classic page is a
+  Service Deck terminal.
+- `shellMode.ts`: the hidden classic fallback. `localStorage vt_classic_mode = "1"` makes the router render
+  the full classic shell and routes instead. It is set by `fallBackToClassic(reason)` (reason kept in
+  `vt_classic_reason` and shown once as a notice in the classic view) when: the game's React tree throws
+  (`GameBoundary` in GamePage, `ShellBoundary` in GameShell for a chunk that fails to load), the engine cannot
+  create a WebGL context, no first frame is drawn within the watchdog time (25 s of visible time;
+  `vt_game_watchdog_ms` overrides it), or the WebGL context is lost. Ctrl+Shift+F12 toggles it by hand
+  (`useClassicChord`, mounted in AppRoutes so it works in both views). "Return to the ship" (the star at the
+  top of the classic side bar) clears it. A page crashing inside a terminal is contained by that terminal's
+  own boundary and never triggers the fallback.
+- Dev builds only: `localStorage vt_game_test_fault = stall | webgl | crash` provokes each failure (harness).
+- `shell.css`: `overflow: clip` on the host, root, CSS3D layer and screen content (with `overflow: hidden` a
+  focus or scroll-into-view scrolls the DOM layer and every screen is then drawn beside its hole), and no
+  `backdrop-filter` on screens (the app theme blurs every Paper/Card; inside the 3D layer each one is a render
+  surface, which cost seconds per frame and enough memory to kill the page under software rendering).
+
+## The Service Deck (embedded classic pages)
+
+- `rooms/vault/terminals.ts` builds a curved bank of eleven lectern terminals along the south windows
+  (149 to 213 degrees, radius 10.05) from palette materials, their colliders and screens (`svc-<id>`), the
+  "SERVICE DECK" sign, and the Bridge Watch screen (`svc-watch`) on the 240 degree wall. `VaultRoom.deck`
+  exposes it; `standAt(id)` gives a place to stand (tests, later fast travel).
+- `ui/ServiceDeck.tsx` renders the content through portals: an idle face (static, sized in container units)
+  until engaged, then the real classic page (the same lazy chunks as the classic routes) inside the shared
+  `Frame`, in a `TerminalBoundary`. The page stays mounted while one of its dialogs is on Comms (its callbacks
+  belong to it) and is unmounted on disengage. `ui/Consoles.tsx`: settings form and account console (the user
+  menu's functions). `ui/BridgeWatch.tsx`: the app's `Clock` and the alert list (links open when engaged).
+- `fitScreenToView(engine, id)`: on dock, a terminal's DOM is resized to the pixel size it has on the monitor
+  (the world size is unchanged, only `element.style.width/height` and `css.scale`), so pages are laid out for
+  the real window and are shown 1:1; floating-ui then positions dropdowns, date pickers and tooltips correctly
+  (verified by the `shell` harness scenario). Comms is fitted the same way when it opens.
+- `terminals.css`: layout of the idle face and page box (`--vt-vh` from the box height, as the station's
+  panels do), the frame inset that keeps content clear of the bevelled bezel, and the reset of game.css's
+  terminal-control restyle of Mantine inside `.vtg-term` screens (embedded pages keep the app theme).
 
 ## Layout
 
@@ -61,8 +105,9 @@ view are `display: none`. Only the docked screen takes pointer events; the canva
 Rules learned the hard way: no `overflow: hidden` on the transformed `.vtg-screen` element (Chrome then
 fails to hit-test it; clip inside `.vtg-screen-content`), and no infinite CSS animations or scroll
 containers on screens that are not docked (they make the browser re-composite every in-world layer).
-Mantine portals opened on a screen are pointed at that screen via a nested `MantineThemeProvider`, but
-popover positioning inside a 3D transform is untested: prefer inline lists to `Select` on screens.
+Mantine portals opened on a screen are pointed at that screen via a nested `MantineThemeProvider`. Popover
+positioning is right when the screen's DOM is shown 1:1 while docked (`fitScreenToView`); on a fixed-size
+native screen that is scaled when docked, prefer inline lists to `Select`.
 
 ## Notifications
 
@@ -73,16 +118,22 @@ Modals (`@mantine/modals`): the app's ModalsProvider renders them into Mantine's
 <body>. `ModalRouter` watches that node; when a modal opens it moves the whole node (React only holds a
 reference to the container, not its place) into the content of a hidden "comms" screen, places that screen
 in front of the camera (or just in front of the engaged screen) and docks it. Inside the screen's 3D
-transform Mantine's fixed overlay is contained by the screen. When the modal closes the node goes back to
+transform Mantine's fixed overlay is contained by the screen. Placement uses the player's pose (not the
+camera's: update and terms dialogs open before the first frame) and shortens when something solid is in the
+way. Over an engaged screen the display is scaled down in the world and put 6 cm in front of it, so the
+camera hardly moves (at full size the camera would sit a hand's width from it and the browser would raster
+its DOM magnified several times). A dialog opened with `closeOnEscape: false` (terms, forced update) locks the
+display: Esc re-engages it instead of dismissing it (`ModalRouter.locked`, fed from `useModals()` in GameCore).
+When the modal closes the node goes back to
 <body> and the previous screen is engaged again; disengaging the comms screen closes the modals; on unmount
 the node is always put back before the engine removes its DOM.
 
-## Leaving the route
+## Leaving the ship
 
-`LogInLayout` wraps the route outlet in a `Suspense` keyed by the first path segment, so a navigation to a
-lazy page unmounts the page being left at once (React 19 transitions would otherwise keep the old tree,
-the full-window game, until the chunk loads). As a second net, GameCore hides its host and stops the
-engine as soon as `location.pathname` differs from the one it mounted on.
+The game unmounts when the app switches to the classic view (fallback or key chord) or logs out. As a second
+net, GameCore hides its host and stops the engine as soon as `isClassic()` is true, even if React still holds
+the tree while a classic chunk loads. `LogInLayout` keeps its `Suspense` keyed by the first path segment for
+the classic view.
 
 ## The Market Observatory
 
