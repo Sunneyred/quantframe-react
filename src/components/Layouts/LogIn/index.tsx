@@ -49,7 +49,7 @@ export function LogInLayout() {
         id: "game",
         link: "game",
         icon: <FontAwesomeIcon size={"lg"} icon={faStar} />,
-        label: "Void (3D preview)",
+        label: "Void Trader (3D)",
         onClick: (e: NavbarLinkProps) => handleNavigate(e),
       },
       {
@@ -57,7 +57,7 @@ export function LogInLayout() {
         id: "station",
         link: "station",
         icon: <FontAwesomeIcon size={"lg"} icon={faGamepad} />,
-        label: "Station",
+        label: "Station (2D, being replaced)",
         onClick: (e: NavbarLinkProps) => handleNavigate(e),
       },
       {

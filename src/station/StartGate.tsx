@@ -12,5 +12,5 @@ export function StationStartGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     markStarted();
   }, []);
-  return redirect ? <Navigate to="/station" replace /> : <>{children}</>;
+  return redirect ? <Navigate to="/game" replace /> : <>{children}</>;
 }
