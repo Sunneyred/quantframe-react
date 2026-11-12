@@ -32,7 +32,7 @@ export function demoSale(gain: number) {
   }
 }
 
-const DEMO_NAMES = ["Ordis_Prime", "VoidRunner77", "xX_Nezha_Xx", "Clem2Grakata", "TennoKat", "PlatBaron", "MesaMain", "Loid.Necraloid"];
+const DEMO_NAMES = ["StarHollow", "VoidRunner77", "xX_Nimbus_Xx", "Kestrel_9", "TradeKat", "PlatBaron", "QuietLantern", "Mirelle.Vant"];
 const DEMO_OFFERS = [
   "Hi! I want to buy: \"Glaive Prime Set\" for 95 platinum. (warframe.market)",
   "Hi! I want to buy: \"Primed Continuity\" (rank 10) for 60 platinum. (warframe.market)",

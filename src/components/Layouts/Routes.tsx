@@ -54,6 +54,8 @@ const WfInventoryPage = lazy(routeLoaders.wfInventory);
 
 // Void Trader: the walk-around station
 const PStation = lazy(() => import("../../station/StationSafe"));
+// Void Trader: the game (phase 1, the Vault)
+const PGame = lazy(() => import("../../game/GamePage"));
 
 export function AppRoutes() {
   const { app_error } = useAppContext();
@@ -104,6 +106,7 @@ export function AppRoutes() {
                   }
                 />
                 <Route path="station" element={<PStation />} />
+                <Route path="game" element={<PGame />} />
                 <Route path="debug">
                   <Route index element={<PDebug />} />
                 </Route>

@@ -455,7 +455,7 @@
   ];
 
   // --- transactions: 329 trades across ~8 months, a couple of sales today
-  const BUYERS = ["Ordis_Prime", "VoidRunner77", "xX_Nezha_Xx", "Clem2Grakata", "TennoKat", "PlatBaron", "MesaMain", "Loid.Necraloid", "SteelPathSam", "KuvaLich42", "Baro_KiTeer", "NightwaveNora"];
+  const BUYERS = ["StarHollow", "VoidRunner77", "xX_Nimbus_Xx", "Kestrel_9", "TradeKat", "PlatBaron", "QuietLantern", "Mirelle.Vant", "IronPathSam", "Ashfall42", "Orren_Vask", "NightwaveNora"];
   const tradable = items.filter((i) => i._price >= 5);
   const makeTransaction = (at, type, forced) => {
     const riven = !forced && rnd() < 0.06;
@@ -535,11 +535,11 @@
     return { id, chat_with: [other], unread_count: unread, chat_name: name, messages, last_update: iso(start + lines.length * 90000) };
   };
   state.chats = [
-    makeChat("Ordis_Prime", 14, "ingame", [[false, 'Hi! I want to buy: "Glaive Prime Set" for 165 platinum. (warframe.market)'], [true, "Sure, inviting you now."], [false, "ty!"]], 0, 30),
+    makeChat("StarHollow", 14, "ingame", [[false, 'Hi! I want to buy: "Glaive Prime Set" for 165 platinum. (warframe.market)'], [true, "Sure, inviting you now."], [false, "ty!"]], 0, 30),
     makeChat("VoidRunner77", 3, "online", [[false, 'Hi! I want to buy: "Primed Continuity" (rank 10) for 60 platinum. (warframe.market)'], [false, "still available?"]], 2, 2),
     makeChat("PlatBaron", 51, "ingame", [[false, "still selling the Rubico riven? can do 400p"], [true, "450 is the lowest I can go."], [false, "ok 430?"], [true, "deal"]], 0, 55),
-    makeChat("TennoKat", 0, "invisible", [[true, 'Hi! I want to sell: "Wisp Prime Set" for 104 platinum. (warframe.market)']], 0, 80),
-    makeChat("Clem2Grakata", 7, "online", [[false, "grakata?"], [true, "Grakata!"]], 0, 200),
+    makeChat("TradeKat", 0, "invisible", [[true, 'Hi! I want to sell: "Wisp Prime Set" for 104 platinum. (warframe.market)']], 0, 80),
+    makeChat("Kestrel_9", 7, "online", [[false, "grakata?"], [true, "Grakata!"]], 0, 200),
   ];
 
   // --- warframe.market orders and auctions
