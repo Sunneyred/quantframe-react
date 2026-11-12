@@ -1,11 +1,11 @@
 {
-  "version": "1.14.0",
-  "notes": "Void Trader 1.14.0",
-  "pub_date": "2026-11-12T15:05:11Z",
+  "version": "1.14.1",
+  "notes": "Void Trader 1.14.1",
+  "pub_date": "2026-11-12T16:16:39Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSVzVlUGJsUFMwUTN5c1lGaUtZUDI2dUxZMEhWSGF4N2wveEQ0Zkd6L29OUUdlS1N2Yjl2UjAveEduaGFKcUdSMFAwenJxRmtrYmxObVh4TExHVDl3OFlndGZ2b1NPQVFzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0NDk1OTExCWZpbGU6dnQxMTQuZXhlCjYyUlVJcmU0bHNRT1QwclhrMWlSQ1lKNGtKam5BdkdwYmd3NnFNeWVqZmphaDQ3ai9BZ2Z2ZW1aWG96MGxobkJhdGRmQXF2bGFrUmIvbzkzcGd5RkFBPT0K",
-      "url": "https://github.com/Sunneyred/quantframe-react/releases/download/v1.14.0/Void.Trader_1.14.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSVzVlUGJsUFMwUXhNR0traU9xZXBhMXZwaGpMNVd3c3dIZzFnWlNDR1ArU0JzeThsWHFIbmFxQkN4eDNESExWaS8vREdtZ3dBd0hqRXlTenJGZ1kyMnorNWVTamZjQ0FnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0NTAwMTk5CWZpbGU6dnQxMTQxLmV4ZQpISFJ1T01mamN5UWJPcm84VnQyM201dzM3STY2SEdZdGF0dElhd0EwY3JzSFNjKzJwUEJDQXhrc3l1dHpuZy8vS3VNOGNLNlR4ci9oekZLSzZ6aHFEUT09Cg==",
+      "url": "https://github.com/Sunneyred/quantframe-react/releases/download/v1.14.1/Void.Trader_1.14.1_x64-setup.exe"
     }
   }
 }
