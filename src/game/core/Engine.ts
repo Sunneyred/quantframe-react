@@ -1,12 +1,14 @@
 import * as THREE from "three";
-import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { CSS3DRenderer } from "three/examples/jsm/renderers/CSS3DRenderer.js";
 import { CopyShader } from "three/examples/jsm/shaders/CopyShader.js";
+import { bakeEnvironment } from "../art/env";
+import { applyTier, type Tier } from "../art/glass";
 import { Palette } from "../art/materials";
+import { DOF, FINISH } from "../art/post";
 import { makePlayerAvatar } from "../entities/figures";
 import { CollisionWorld } from "./collision";
 import { Emitter, store, stored } from "./events";
@@ -28,7 +30,12 @@ import { CSS_SCALE, ScreenManager } from "./screens";
  *   cssScene: one CSS3DObject per screen, transforms copied from the anchors every frame.
  *
  * Frame: input -> player -> systems (room animation) -> camera pose (player, blended by docking)
- *        -> interaction focus -> screen culling -> WebGL render (+ bloom on high) -> CSS3D render.
+ *        -> interaction focus -> screen culling -> WebGL render -> CSS3D render.
+ *
+ * Render, LOW: one pass straight to the canvas (tone mapped in the materials), no post.
+ * Render, HIGH: scene -> half-float MSAA target with a depth texture (glass show pieces add
+ *   three's transmission pass) -> depth of field (only while docked) -> bloom -> output (ACES)
+ *   -> finish (the scene's alpha back, vignette). See art/post.ts.
  */
 
 export interface EngineEvents {
@@ -60,22 +67,7 @@ export interface Room {
 }
 
 const VIEW_KEY = "vt_game_view";
-const FLOOR_RADIUS = 12;
-
-const ALPHA_FIX = {
-  uniforms: { tDiffuse: { value: null as THREE.Texture | null }, tBase: { value: null as THREE.Texture | null } },
-  vertexShader: CopyShader.vertexShader,
-  fragmentShader: /* glsl */ `
-    uniform sampler2D tDiffuse;
-    uniform sampler2D tBase;
-    varying vec2 vUv;
-    void main() {
-      vec4 c = texture2D(tDiffuse, vUv);
-      float a = clamp(texture2D(tBase, vUv).a, 0.0, 1.0);
-      // where a screen shows through (a = 0) let only a little bloom spill over it, premultiplied
-      gl_FragColor = vec4(c.rgb * mix(0.3, 1.0, a), a);
-    }`,
-};
+const FLOOR_RADIUS = 12.5;
 
 export class Engine {
   readonly events = new Emitter<EngineEvents>();
@@ -99,6 +91,11 @@ export class Engine {
   private composer: EffectComposer | null = null;
   private baseRT: THREE.WebGLRenderTarget | null = null;
   private bloom: UnrealBloomPass | null = null;
+  private dof: ShaderPass | null = null;
+  /** 0..1, eased: how far the view is settled on a docked screen (drives the depth of field). */
+  private dockBlend = 0;
+  private dockedId: string | null = null;
+  private fwd = new THREE.Vector3();
   private envRT: THREE.WebGLRenderTarget | null = null;
   private raf = 0;
   private last = 0;
@@ -140,13 +137,9 @@ export class Engine {
     this.camera = new THREE.PerspectiveCamera(62, 1, 0.05, 1200);
     this.palette = new Palette(FLOOR_RADIUS);
 
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
-    const env = new RoomEnvironment();
-    this.envRT = pmrem.fromScene(env, 0.04);
-    env.dispose();
-    pmrem.dispose();
+    this.envRT = bakeEnvironment(this.renderer, this.palette.env);
     this.scene.environment = this.envRT.texture;
-    this.scene.environmentIntensity = 0.22;
+    this.scene.environmentIntensity = 0.5;
 
     this.interact = new InteractSystem(this.scene);
     this.screens = new ScreenManager(this.scene, this.cssScene, this.palette, this.interact, (id) => this.onDockChange(id));
@@ -181,6 +174,7 @@ export class Engine {
 
   setRoom(room: Room) {
     this.room = room;
+    applyTier(this.scene, this.quality === "high");
     this.player.place(room.spawn.x, room.spawn.z, room.spawn.yaw);
   }
 
@@ -211,16 +205,24 @@ export class Engine {
     this.composer = null;
     this.baseRT = null;
     this.bloom = null;
+    this.dof = null;
+    // show glass (transmission) on high, the cheap glass shader on low
+    applyTier(this.scene, high);
     if (!high) return;
-    this.baseRT = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+    this.baseRT = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4, depthTexture: new THREE.DepthTexture(1, 1) });
     const composer = new EffectComposer(this.renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType }));
     const copy = new ShaderPass(CopyShader, "tUnused");
     copy.uniforms.tDiffuse.value = this.baseRT.texture;
     composer.addPass(copy);
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.38, 0.5, 0.9);
+    this.dof = new ShaderPass(DOF);
+    this.dof.uniforms.tDepth.value = this.baseRT.depthTexture;
+    this.dof.enabled = false;
+    composer.addPass(this.dof);
+    // restrained: only the lamps, the lit glass and the liquid cross the threshold
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.3, 0.55, 0.92);
     composer.addPass(this.bloom);
     composer.addPass(new OutputPass());
-    const fix = new ShaderPass(ALPHA_FIX);
+    const fix = new ShaderPass(FINISH);
     fix.uniforms.tBase.value = this.baseRT.texture;
     composer.addPass(fix);
     this.composer = composer;
@@ -286,6 +288,7 @@ export class Engine {
   }
 
   private onDockChange(id: string | null) {
+    this.dockedId = id;
     this.input.uiMode = id !== null;
     this.root.classList.toggle("is-docked", id !== null);
     if (id) {
@@ -349,6 +352,7 @@ export class Engine {
     const t = this.time;
     const control = !this.screens.busy;
     this.player.update(dt, this.input, control, t);
+    this.palette.update(t);
     this.room?.update(dt, t);
     for (const s of this.systems) s(dt, t);
 
@@ -361,7 +365,31 @@ export class Engine {
 
     this.interact.update(this.camera, this.player.eye(this.eye), control, t);
     this.screens.update(this.camera);
+    this.focus(dt);
     if (render) this.render();
+  }
+
+  /** Depth of field follows the docking flight: focus on the docked screen's plane, blur by distance from it. */
+  private focus(dt: number) {
+    const target = this.dockedId ? 1 : 0;
+    this.dockBlend = THREE.MathUtils.clamp(this.dockBlend + (target ? dt : -dt) / 0.7, 0, 1);
+    const dof = this.dof;
+    if (!dof) return;
+    const s = this.dockedId ? this.screens.get(this.dockedId) : null;
+    dof.enabled = this.dockBlend > 0.01;
+    if (!dof.enabled) return;
+    const k = this.dockBlend * this.dockBlend * (3 - 2 * this.dockBlend);
+    const u = dof.uniforms;
+    if (s) {
+      this.camera.getWorldDirection(this.fwd);
+      u.uFocus.value = Math.max(0.2, this.eye.copy(s.center).sub(this.camera.position).dot(this.fwd));
+      // the sharp slab covers the screen, its bezel and the furniture it stands on
+      u.uDead.value = 0.25 + Math.max(s.width, s.height) * 0.12;
+      u.uRange.value = 2.5 + u.uFocus.value * 1.2;
+    }
+    u.uNear.value = this.camera.near;
+    u.uFar.value = this.camera.far;
+    u.uRadius.value = k * 9 * this.renderer.getPixelRatio() * (this.size.h / 800);
   }
 
   private render() {
@@ -399,6 +427,7 @@ export class Engine {
     this.css.setSize(w, h);
     const pr = this.renderer.getPixelRatio();
     this.baseRT?.setSize(Math.floor(w * pr), Math.floor(h * pr));
+    this.dof?.uniforms.uTexel.value.set(1 / Math.max(1, Math.floor(w * pr)), 1 / Math.max(1, Math.floor(h * pr)));
     if (this.composer) {
       this.composer.setPixelRatio(pr);
       this.composer.setSize(w, h);
@@ -436,12 +465,18 @@ export class Engine {
     this.scene.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (mesh.geometry) mesh.geometry.dispose();
+      // both tiers of a tiered mesh, whichever is on it now
+      const tier = (o.userData as { tier?: Tier }).tier;
+      if (tier) {
+        collect(tier.low);
+        if (tier.made) collect(tier.made);
+      }
       const mat = mesh.material;
       if (Array.isArray(mat)) mat.forEach(collect);
       else if (mat) collect(mat);
     });
-    for (const m of Object.values(this.palette)) if (m instanceof THREE.Material) collect(m);
-    if (this.palette.dot) textures.add(this.palette.dot);
+    for (const m of this.palette.all()) collect(m);
+    for (const t of this.palette.ownTextures()) textures.add(t);
     for (const t of textures) t.dispose();
     this.composer?.dispose();
     this.baseRT?.dispose();

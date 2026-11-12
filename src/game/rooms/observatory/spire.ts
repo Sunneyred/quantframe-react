@@ -167,7 +167,7 @@ export class Spire {
   constructor(p: Palette) {
     this.group.name = "order-spire";
     // --- pedestal
-    const dais = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.35, 0.32, 48), p.pearlPlain);
+    const dais = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.35, 0.32, 48), p.wood);
     dais.position.y = 0.16;
     this.group.add(dais);
     const rim = new THREE.Mesh(new THREE.TorusGeometry(1.16, 0.035, 8, 64), p.gold);

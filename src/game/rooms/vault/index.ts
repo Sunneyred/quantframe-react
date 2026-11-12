@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { additive, faceCentre, gyroOrnament, polar } from "../../art/kit";
+import { additive, Batch, faceCentre, gyroOrnament, polar } from "../../art/kit";
+import { consoleBody, Idlers, pedestal, tradeCounter } from "../../art/props";
 import { CanvasLabel, CYAN, drawGlyph, FONT_DISPLAY, GOLD } from "../../art/textures";
 import type { Engine, Room } from "../../core/Engine";
 import type { Quality } from "../../core/quality";
@@ -47,6 +48,7 @@ export class VaultRoom implements Room {
     hooks: VaultHooks,
   ) {
     const { scene, palette: p, world, screens, interact } = engine;
+    this.idlers = new Idlers(p);
     this.shell = buildShell(p, scene);
     const tex = this.tickerLabel.texture;
     tex.wrapS = THREE.RepeatWrapping;
@@ -62,15 +64,10 @@ export class VaultRoom implements Room {
     world.circle(0, 0, 2.2);
     const lectern = new THREE.Group();
     lectern.position.set(0, 0, 2.0);
-    const lecternBody = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.82, 0.6), p.pearlPlain);
-    lecternBody.position.y = 0.41;
-    lectern.add(lecternBody);
-    const lecternTop = new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.05, 0.7), p.gold);
-    lecternTop.position.y = 0.84;
-    lectern.add(lecternTop);
-    const lecternBand = new THREE.Mesh(new THREE.PlaneGeometry(1.85, 0.2), p.filigree);
-    lecternBand.position.set(0, 0.55, 0.302);
-    lectern.add(lecternBand);
+    const lecternBatch = new Batch();
+    consoleBody(lecternBatch, this.idlers, p, 1.85, 0.86, 0.6, { frame: lectern.matrix.clone().setPosition(lectern.position), lamps: "amber" });
+    lecternBatch.build(lectern, { cast: true });
+    lectern.add(p.shadowDecal(2.6, 1.3));
     scene.add(lectern);
     world.box(0, 2.05, 1.0, 0.42);
 
@@ -142,6 +139,9 @@ export class VaultRoom implements Room {
     this.sculptures();
 
     this.screens = { reservoir: reservoirScreen, desk: deskScreen, stock: stockScreen, pa, console: consoleScreen, sign };
+    this.idlers.build();
+    scene.add(this.idlers.group);
+    this.updates.push((_dt, t) => this.idlers.update(t));
     this.lever = this.leverGroup;
     this.setQuality(engine.quality);
     this.setTicker(["THE VAULT IS LISTENING"]);
@@ -153,6 +153,8 @@ export class VaultRoom implements Room {
   // ---------------------------------------------------------------------------
 
   private deskProjector!: { cone: THREE.Mesh; ring: THREE.Mesh; sprite: THREE.Sprite };
+  /** Dial needles of the consoles' instrument clusters (world frame). */
+  private idlers!: Idlers;
 
   private buildDesk() {
     const { scene, palette: p, world } = this.engine;
@@ -163,39 +165,13 @@ export class VaultRoom implements Room {
     const L = 3.7;
     const D = 0.9;
     const H = 1.06;
-    // a curved-front counter: body, plinth, top
-    const body = new THREE.Mesh(new THREE.BoxGeometry(L, H - 0.1, D), p.pearl);
-    body.position.y = (H - 0.1) / 2 + 0.06;
-    g.add(body);
-    const plinth = new THREE.Mesh(new THREE.BoxGeometry(L + 0.12, 0.12, D + 0.12), p.ivory);
-    plinth.position.y = 0.06;
-    g.add(plinth);
-    const top = new THREE.Mesh(new THREE.BoxGeometry(L + 0.2, 0.07, D + 0.2), p.steel);
-    top.position.y = H;
-    g.add(top);
-    const lip = new THREE.Mesh(new THREE.BoxGeometry(L + 0.22, 0.025, 0.03), p.cyanGlow);
-    lip.position.set(0, H - 0.02, (D + 0.2) / 2);
-    g.add(lip);
-    const band = new THREE.Mesh(new THREE.PlaneGeometry(L, 0.26), p.filigree);
-    const uv = band.geometry.attributes.uv as THREE.BufferAttribute;
-    for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * (L / 2));
-    band.position.set(0, 0.62, D / 2 + 0.003);
-    g.add(band);
-    for (const x of [-L / 2, L / 2]) {
-      const end = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, H + 0.1, 16), p.gold);
-      end.position.set(x, (H + 0.1) / 2, 0);
-      g.add(end);
-      const cap = new THREE.Mesh(new THREE.OctahedronGeometry(0.14, 0), p.goldGlow);
-      cap.position.set(x, H + 0.28, 0);
-      cap.scale.y = 1.6;
-      g.add(cap);
-    }
-    // the screen's emitter slab
-    const emitter = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.06, 0.3), p.gold);
-    emitter.position.set(-0.86, H + 0.06, 0.05);
-    g.add(emitter);
+    // the counter (art/props.ts), and the brass emitter slab the screen stands on
+    const counter = new Batch();
+    tradeCounter(counter, p, L, D, H);
+    counter.put(new THREE.BoxGeometry(1.7, 0.05, 0.3), p.gold, [-0.86, H + 0.025, 0.05]);
+    counter.build(g, { cast: true });
     const emitLine = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.012, 0.012), p.cyanGlow);
-    emitLine.position.set(-0.86, H + 0.095, 0.2);
+    emitLine.position.set(-0.86, H + 0.056, 0.2);
     g.add(emitLine);
     // the holographic queue projector, south end
     const proj = new THREE.Group();
@@ -227,7 +203,7 @@ export class VaultRoom implements Room {
       (sprite.material as THREE.SpriteMaterial).opacity = 0.85 + Math.sin(t * 23) * 0.04 + (Math.sin(t * 0.7) > 0.97 ? -0.3 : 0);
     });
     g.add(p.shadowDecal(L + 0.8, D + 0.8));
-    const lamp = new THREE.PointLight(0x2ad4e6, 7, 7, 1.6);
+    const lamp = new THREE.PointLight(0xffc27a, 7, 7, 1.6);
     lamp.position.set(-0.6, 2.4, 1.0);
     g.add(lamp);
     world.box(g.position.x, g.position.z, L / 2 + 0.25, D / 2 + 0.12, g.rotation.y);
@@ -241,13 +217,9 @@ export class VaultRoom implements Room {
     g.position.copy(at);
     g.rotation.y = faceCentre(270);
     scene.add(g);
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.7, 0.5, 24), p.pearlPlain);
-    base.position.y = 0.25;
-    g.add(base);
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.56, 0.03, 6, 40), p.gold);
-    rim.rotation.x = Math.PI / 2;
-    rim.position.y = 0.5;
-    g.add(rim);
+    const drum = new Batch();
+    pedestal(drum, p, 0.52, 0.5, p.bakelite);
+    drum.build(g, { cast: true });
     const lens = new THREE.Mesh(new THREE.SphereGeometry(0.18, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), p.cyanGlow);
     lens.position.y = 0.5;
     g.add(lens);
@@ -264,7 +236,7 @@ export class VaultRoom implements Room {
     fan.rotation.x = -0.45;
     g.add(fan);
     g.add(p.shadowDecal(1.8));
-    const lamp = new THREE.PointLight(0x2ad4e6, 5, 6, 1.6);
+    const lamp = new THREE.PointLight(0x58d8cc, 4, 6, 1.6);
     lamp.position.set(0, 2.4, 0.8);
     g.add(lamp);
     world.circle(at.x, at.z, 0.75);
@@ -279,12 +251,10 @@ export class VaultRoom implements Room {
     g.position.copy(polar(deg, 9.3));
     g.rotation.y = faceCentre(deg);
     scene.add(g);
-    const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.9, 0.55), p.pearlPlain);
-    body.position.y = 0.45;
-    g.add(body);
-    const top = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.05, 0.65), p.gold);
-    top.position.y = 0.92;
-    g.add(top);
+    g.updateMatrix();
+    const body = new Batch();
+    consoleBody(body, this.idlers, p, 1.1, 0.94, 0.55, { frame: g.matrix.clone(), colour: "teal" });
+    body.build(g, { cast: true });
     g.add(p.shadowDecal(1.6, 1.1));
     // the physical lever: up = high fidelity, down = low
     const lever = new THREE.Group();
@@ -414,14 +384,10 @@ export class VaultRoom implements Room {
     const { scene, palette: p, world } = this.engine;
     for (const deg of [300, 245]) {
       const at = polar(deg, 10.2);
-      const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 1.1, 8), p.pearlPlain);
-      plinth.position.copy(at).setY(0.55);
-      scene.add(plinth);
-      const trim = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.025, 6, 8), p.gold);
-      trim.rotation.x = Math.PI / 2;
-      trim.position.copy(at).setY(1.1);
-      scene.add(trim);
-      const o = gyroOrnament(0.42, p.gold, deg === 300 ? p.cyanGlow : p.goldGlow, p.pearlPlain);
+      const plinth = new Batch().at(at.x, 0, at.z);
+      pedestal(plinth, p, 0.42, 1.1);
+      plinth.build(scene, { cast: true });
+      const o = gyroOrnament(0.42, p.gold, deg === 300 ? p.cyanGlow : p.goldGlow, p.glass.clear);
       o.group.position.copy(at).setY(1.85);
       scene.add(o.group);
       const decal = p.shadowDecal(1.6);
