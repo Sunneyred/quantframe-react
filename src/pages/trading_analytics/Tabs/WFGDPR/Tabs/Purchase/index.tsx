@@ -158,7 +158,7 @@ export const PurchasePanel = ({ value }: PurchasePanelProps) => {
               <Title order={4} mb={"sm"}>
                 {useTranslate("titles.most_purchased_items")}
               </Title>
-              <Table.ScrollContainer minWidth={"50%"} maxHeight={"calc(100vh - 500px)"}>
+              <Table.ScrollContainer minWidth={"50%"} maxHeight={"calc(var(--vt-vh, 100vh) - 500px)"}>
                 <Table>
                   <Table.Thead>
                     <Table.Tr>

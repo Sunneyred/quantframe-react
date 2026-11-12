@@ -38,7 +38,7 @@ export namespace TauriTypes {
     RefreshSyndicateItems = "LiveScraper:RefreshSyndicateItems",
     RefreshWfmOrders = "LiveScraper:RefreshWfmOrders",
     OnDeleteWfmOrders = "Wfm:OnDeleteOrders",
-    RefreshWfmAuctions = "LiveScraper:RefreshWfmAuctions",
+    RefreshWfmAuctions = "Wfm:RefreshAuctions",
     RefreshTransactions = "Transaction:RefreshTransactions",
     OnDeleteWfmAuctions = "Wfm:OnDeleteAuctions",
     OnNotify = "App:OnNotify",

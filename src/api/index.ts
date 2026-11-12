@@ -302,18 +302,35 @@ function getLogInfo(error: unknown): ResponseError {
   };
 }
 
+/** Something the IPC layer can always serialise (an Error or an Event turns into `{}` otherwise). */
+function toLogContext(value: unknown): unknown {
+  if (value instanceof Error) return { name: value.name, message: value.message, stack: value.stack };
+  if (typeof ErrorEvent !== "undefined" && value instanceof ErrorEvent)
+    return { message: value.message, filename: value.filename, line: value.lineno, column: value.colno, stack: value.error?.stack };
+  try {
+    return JSON.parse(JSON.stringify(value ?? null));
+  } catch {
+    return String(value);
+  }
+}
+
 const SendErrorLog = async (error: unknown) => {
   console.error("Unhandled error:", error);
   const { cause, component, properties } = getLogInfo(error);
 
-  await invoke("log", {
-    cause,
-    component,
-    location: "unknown",
-    logLevel: "Critical",
-    message: cause,
-    properties,
-  });
+  try {
+    // The backend command takes the details as `context` (see src-tauri/src/commands/logs.rs).
+    await invoke("log", {
+      cause,
+      component,
+      location: "unknown",
+      logLevel: "Critical",
+      message: cause,
+      context: toLogContext(properties),
+    });
+  } catch {
+    // Logging an error must never raise another unhandled rejection (that would loop).
+  }
 };
 window.addEventListener("unhandledrejection", async (event) => await SendErrorLog(event));
 window.addEventListener("error", async (event) => await SendErrorLog(event));

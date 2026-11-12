@@ -4,7 +4,9 @@ export class LiveScraperModule {
   constructor(private readonly client: TauriClient) {}
 
   async toggle(): Promise<void> {
-    this.client.sendInvoke("live_scraper_toggle");
+    // awaited, so a refusal reaches the caller's error handling instead of the global
+    // unhandled-rejection logger
+    await this.client.sendInvoke("live_scraper_toggle");
   }
   async get_interesting_wtb_items(settings: TauriTypes.ItemSettings): Promise<TauriTypes.ItemPriceInfo[]> {
     return await this.client.sendInvoke("live_scraper_get_interesting_wtb_items", { settings });

@@ -151,7 +151,7 @@ const PresetCard = ({
 
 const FeedRow = ({ entry }: { entry: StrategyAdjustment }) => (
   <Group gap="xs" wrap="nowrap" align="flex-start">
-    <Text size="xs" c="dimmed" ff="monospace" w={44} style={{ flexShrink: 0 }}>
+    <Text size="xs" c="dimmed" ff="monospace" miw={44} style={{ flexShrink: 0, whiteSpace: "nowrap" }}>
       {timeOf(entry.time)}
     </Text>
     <Text size="sm" lh={1.35}>
@@ -253,6 +253,7 @@ export const StrategyPanel = () => {
                 size="xs"
                 w={150}
                 min={0}
+                allowDecimal={false}
                 label="Your plat right now"
                 placeholder="e.g. 76"
                 value={platDraft}

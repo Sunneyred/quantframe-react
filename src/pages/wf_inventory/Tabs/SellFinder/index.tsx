@@ -1,9 +1,11 @@
 import { Alert, Badge, Box, Button, Group, NumberInput, Paper, ScrollArea, SegmentedControl, Stack, Table, Text, TextInput, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useEffect, useMemo, useState } from "react";
-import api from "@api/index";
+import api, { SendTauriEvent } from "@api/index";
+import { TauriTypes } from "$types";
 import type { SellCandidate, SellFinderResult } from "@api/wf_inventory";
 import { useAppContext } from "@contexts/app.context";
+import { useHasAlert } from "@hooks/useHasAlert.hook";
 import { PlatGoalBar } from "@components/Shared/PlatGoalBar";
 
 export type SellFinderPanelProps = { isActive?: boolean };
@@ -23,6 +25,8 @@ const errorText = (e: any) => e?.message || e?.cause || (typeof e === "string" ?
 /** Void Trader: ranks everything you own that is worth listing. */
 export const SellFinderPanel = ({ isActive }: SellFinderPanelProps) => {
   const { settings } = useAppContext();
+  // the page moves down 30px when the alert ticker is showing
+  const hasAlert = useHasAlert();
   const [data, setData] = useState<SellFinderResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +57,9 @@ export const SellFinderPanel = ({ isActive }: SellFinderPanelProps) => {
     setError(null);
     try {
       await api.app.updateSettings({ ...settings, wf_inventory: { ...settings.wf_inventory, source: { Alecaframe: { path: "" } } } } as any);
+      // the backend does not announce a settings change: re-read them, or this page keeps thinking
+      // there is no source and the settings form would later save the old "None" back
+      SendTauriEvent(TauriTypes.Events.RefreshSettings);
       await api.wf_inventory.refresh();
       setData(await api.wf_inventory.sellFinder(minPrice));
     } catch (e) {
@@ -138,7 +145,7 @@ export const SellFinderPanel = ({ isActive }: SellFinderPanelProps) => {
             <NumberInput label="Hide under (plat)" min={0} w={150} value={minPrice} onChange={(v) => setMinPrice(Number(v) || 0)} />
             <SegmentedControl data={CATEGORIES} value={category} onChange={setCategory} />
           </Group>
-          <ScrollArea h="calc(100vh - 400px)">
+          <ScrollArea h={`calc(var(--vt-vh, 100vh) - ${hasAlert ? 430 : 400}px)`}>
             <Table stickyHeader highlightOnHover>
               <Table.Thead>
                 <Table.Tr>

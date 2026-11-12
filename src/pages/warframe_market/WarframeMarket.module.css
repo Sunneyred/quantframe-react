@@ -5,17 +5,17 @@
 }
 
 .orders {
-  height: calc(100vh - 325px);
+  height: calc(var(--vt-vh, 100vh) - 325px);
 
   &[data-has-alert="true"] {
-    height: calc(100vh - 355px);
+    height: calc(var(--vt-vh, 100vh) - 355px);
   }
 }
 
 .auctions {
-  height: calc(100vh - 270px);
+  height: calc(var(--vt-vh, 100vh) - 270px);
 
   &[data-has-alert="true"] {
-    height: calc(100vh - 302px);
+    height: calc(var(--vt-vh, 100vh) - 302px);
   }
 }

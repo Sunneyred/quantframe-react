@@ -11,7 +11,9 @@
 .databaseSyndicateItems,
 .databaseStockWishlist {
   --offset: 400px;
-  height: calc(100vh - var(--offset)) !important;
+  /* Void Trader: the strategy panel sits above the tabs; the table gives up its height and never
+     gets smaller than a few rows (the page scrolls instead, e.g. with the presets expanded). */
+  height: max(260px, calc(var(--vt-vh, 100vh) - var(--offset) - var(--vt-strategy-h, 0px))) !important;
 
   &.alert {
     --offset: 419px;
@@ -24,4 +26,14 @@
   &.alert.running {
     --offset: 445px;
   }
+}
+
+.page {
+  height: calc(var(--vt-vh, 100vh) - 65px);
+  overflow-y: auto;
+}
+
+/* flow-root: the panel's own margins count towards the measured height */
+.strategy {
+  display: flow-root;
 }

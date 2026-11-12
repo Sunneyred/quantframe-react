@@ -10,7 +10,7 @@ export type ChartViewProps = {
   height?: number | string;
 };
 
-export function ChartView({ transactions, height = "65vh" }: ChartViewProps) {
+export function ChartView({ transactions, height = "calc(var(--vt-vh, 100vh) - 380px)" }: ChartViewProps) {
   const theme = useMantineTheme();
   const useTranslate = (key: string, context?: { [key: string]: any }, i18Key?: boolean) =>
     useTranslatePages(`trading_analytics.tabs.transaction.chart.${key}`, { ...context }, i18Key);

@@ -1,0 +1,1605 @@
+{
+ "alert_get_alerts": {
+  "file": "src-tauri/src/commands/alert.rs",
+  "args": {},
+  "returns": "Result<Paginated<Alert>, Error>"
+ },
+ "app_accept_tos": {
+  "file": "src-tauri/src/commands/app.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   }
+  },
+  "returns": "Result<(), Error>"
+ },
+ "app_exit": {
+  "file": "src-tauri/src/commands/app.rs",
+  "args": {},
+  "returns": "Result<(), Error>"
+ },
+ "app_get_app_info": {
+  "file": "src-tauri/src/commands/app.rs",
+  "args": {},
+  "returns": "Result<Value, Error>"
+ },
+ "app_get_default_settings": {
+  "file": "src-tauri/src/commands/app.rs",
+  "args": {},
+  "returns": "Result<Settings, Error>"
+ },
+ "app_get_settings": {
+  "file": "src-tauri/src/commands/app.rs",
+  "args": {},
+  "returns": "Result<Settings, Error>"
+ },
+ "app_notify_reset": {
+  "file": "src-tauri/src/commands/app.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   }
+  },
+  "returns": "Result<Value, Error>"
+ },
+ "app_update_settings": {
+  "file": "src-tauri/src/commands/app.rs",
+  "args": {
+   "settings": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "Settings"
+   }
+  },
+  "returns": "Result<Settings, Error>"
+ },
+ "auction_delete_all": {
+  "file": "src-tauri/src/commands/auction.rs",
+  "args": {},
+  "returns": "Result<(), Error>"
+ },
+ "auction_delete_by_id": {
+  "file": "src-tauri/src/commands/auction.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   }
+  },
+  "returns": "Result<(), Error>"
+ },
+ "auction_import_by_id": {
+  "file": "src-tauri/src/commands/auction.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "bought": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   }
+  },
+  "returns": "Result<stock_riven::Model, Error>"
+ },
+ "auction_refresh": {
+  "file": "src-tauri/src/commands/auction.rs",
+  "args": {},
+  "returns": "Result<(), Error>"
+ },
+ "auth_has_permission": {
+  "file": "src-tauri/src/commands/auth.rs",
+  "args": {
+   "flag": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   }
+  },
+  "returns": "Result<bool, Error>"
+ },
+ "auth_login": {
+  "file": "src-tauri/src/commands/auth.rs",
+  "args": {
+   "email": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "password": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   }
+  },
+  "returns": "Result<User, Error>"
+ },
+ "auth_logout": {
+  "file": "src-tauri/src/commands/auth.rs",
+  "args": {},
+  "returns": "Result<User, Error>"
+ },
+ "auth_me": {
+  "file": "src-tauri/src/commands/auth.rs",
+  "args": {},
+  "returns": "Result<User, Error>"
+ },
+ "cache_create_theme": {
+  "file": "src-tauri/src/commands/cache.rs",
+  "args": {
+   "name": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "author": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "properties": {
+    "optional": false,
+    "kind": "any",
+    "rust": "Value"
+   }
+  },
+  "returns": "Result<(), Error>"
+ },
+ "cache_get_chat_icons": {
+  "file": "src-tauri/src/commands/cache.rs",
+  "args": {},
+  "returns": "Result<Vec<CacheChatIcon>, Error>"
+ },
+ "cache_get_chat_link": {
+  "file": "src-tauri/src/commands/cache.rs",
+  "args": {
+   "uniqueName": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   }
+  },
+  "returns": "Result<ChatLink, Error>"
+ },
+ "cache_get_riven_attributes": {
+  "file": "src-tauri/src/commands/cache.rs",
+  "args": {},
+  "returns": "Result<Vec<CacheAttribute>, Error>"
+ },
+ "cache_get_riven_weapons": {
+  "file": "src-tauri/src/commands/cache.rs",
+  "args": {},
+  "returns": "Result<Vec<CacheWeaponBase>, Error>"
+ },
+ "cache_get_syndicates": {
+  "file": "src-tauri/src/commands/cache.rs",
+  "args": {},
+  "returns": "Result<Vec<CacheSyndicate>, Error>"
+ },
+ "cache_get_theme_presets": {
+  "file": "src-tauri/src/commands/cache.rs",
+  "args": {},
+  "returns": "Result<Vec<CacheTheme>, Error>"
+ },
+ "cache_get_tradable_items": {
+  "file": "src-tauri/src/commands/cache.rs",
+  "args": {},
+  "returns": "Result<Vec<CacheTradableItem>, Error>"
+ },
+ "cache_open_theme_folder": {
+  "file": "src-tauri/src/commands/cache.rs",
+  "args": {},
+  "returns": "Result<(), Error>"
+ },
+ "chat_delete": {
+  "file": "src-tauri/src/commands/chat.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   }
+  },
+  "returns": "Result<String, Error>"
+ },
+ "chat_get_messages_by_id": {
+  "file": "src-tauri/src/commands/chat.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   }
+  },
+  "returns": "Result<Vec<ChatMessage>, Error>"
+ },
+ "chat_refresh": {
+  "file": "src-tauri/src/commands/chat.rs",
+  "args": {},
+  "returns": "Result<(), Error>"
+ },
+ "chat_send_message": {
+  "file": "src-tauri/src/commands/chat.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "msg": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   }
+  },
+  "returns": "Result<(), Error>"
+ },
+ "chat_set_active": {
+  "file": "src-tauri/src/commands/chat.rs",
+  "args": {
+   "id": {
+    "optional": true,
+    "kind": "string",
+    "rust": "Option<String>"
+   }
+  },
+  "returns": "Result<(), Error>"
+ },
+ "dashboard_summary": {
+  "file": "src-tauri/src/commands/dashboard.rs",
+  "args": {},
+  "returns": "Result<Value, Error>"
+ },
+ "debug_export_ee_logs": {
+  "file": "src-tauri/src/commands/debug.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "LineEntryPaginationQueryDto"
+   }
+  },
+  "returns": "Result<String, Error>"
+ },
+ "debug_get_ee_logs": {
+  "file": "src-tauri/src/commands/debug.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "LineEntryPaginationQueryDto"
+   }
+  },
+  "returns": "Result<PaginatedResult<LineEntry>, Error>"
+ },
+ "debug_get_wfm_state": {
+  "file": "src-tauri/src/commands/debug.rs",
+  "args": {},
+  "returns": "Result<Value, Error>"
+ },
+ "debug_test": {
+  "file": "src-tauri/src/commands/debug.rs",
+  "args": {},
+  "returns": "Result<Properties, Error>"
+ },
+ "export_item_price_data": {
+  "file": "src-tauri/src/commands/item.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "ItemPricePaginationQueryDto"
+   }
+  },
+  "returns": "Result<String, Error>"
+ },
+ "export_riven_price_data": {
+  "file": "src-tauri/src/commands/riven.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "RivenPricePaginationQueryDto"
+   }
+  },
+  "returns": "Result<String, Error>"
+ },
+ "export_stock_item_json": {
+  "file": "src-tauri/src/commands/stock_item.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "StockItemPaginationQueryDto"
+   }
+  },
+  "returns": "Result<String, Error>"
+ },
+ "export_stock_riven_json": {
+  "file": "src-tauri/src/commands/stock_riven.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "StockRivenPaginationQueryDto"
+   }
+  },
+  "returns": "Result<String, Error>"
+ },
+ "export_syndicate_item_json": {
+  "file": "src-tauri/src/commands/syndicate_item.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "SyndicateItemPaginationQueryDto"
+   }
+  },
+  "returns": "Result<String, Error>"
+ },
+ "export_syndicate_item_price_data": {
+  "file": "src-tauri/src/commands/syndicate_price.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "SyndicateItemPricePaginationQueryDto"
+   }
+  },
+  "returns": "Result<String, Error>"
+ },
+ "export_trade_entry_json": {
+  "file": "src-tauri/src/commands/trade_entry.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "TradeEntryPaginationQueryDto"
+   }
+  },
+  "returns": "Result<String, Error>"
+ },
+ "export_transaction_json": {
+  "file": "src-tauri/src/commands/transaction.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "TransactionPaginationQueryDto"
+   }
+  },
+  "returns": "Result<String, Error>"
+ },
+ "export_wish_list_json": {
+  "file": "src-tauri/src/commands/wish_list.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "WishListPaginationQueryDto"
+   }
+  },
+  "returns": "Result<String, Error>"
+ },
+ "get_chat_pagination": {
+  "file": "src-tauri/src/commands/chat.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "WfmChatPaginationQueryDto"
+   }
+  },
+  "returns": "Result<PaginatedResult<Chat>, Error>"
+ },
+ "get_known_riven_weapons": {
+  "file": "src-tauri/src/commands/riven_pricer.rs",
+  "args": {},
+  "returns": "Result<Vec<String>, Error>"
+ },
+ "get_stock_item_financial_report": {
+  "file": "src-tauri/src/commands/stock_item.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "StockItemPaginationQueryDto"
+   }
+  },
+  "returns": "Result<FinancialReport, Error>"
+ },
+ "get_stock_item_pagination": {
+  "file": "src-tauri/src/commands/stock_item.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "StockItemPaginationQueryDto"
+   }
+  },
+  "returns": "Result<PaginatedResult<stock_item::Model>, Error>"
+ },
+ "get_stock_item_status_counts": {
+  "file": "src-tauri/src/commands/stock_item.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "StockItemPaginationQueryDto"
+   }
+  },
+  "returns": "Result<HashMap<String, usize>, Error>"
+ },
+ "get_stock_riven_financial_report": {
+  "file": "src-tauri/src/commands/stock_riven.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "StockRivenPaginationQueryDto"
+   }
+  },
+  "returns": "Result<FinancialReport, Error>"
+ },
+ "get_stock_riven_pagination": {
+  "file": "src-tauri/src/commands/stock_riven.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "StockRivenPaginationQueryDto"
+   }
+  },
+  "returns": "Result<PaginatedResult<stock_riven::Model>, Error>"
+ },
+ "get_stock_riven_status_counts": {
+  "file": "src-tauri/src/commands/stock_riven.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "StockRivenPaginationQueryDto"
+   }
+  },
+  "returns": "Result<HashMap<String, usize>, Error>"
+ },
+ "get_syndicate_item_financial_report": {
+  "file": "src-tauri/src/commands/syndicate_item.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "SyndicateItemPaginationQueryDto"
+   }
+  },
+  "returns": "Result<FinancialReport, Error>"
+ },
+ "get_syndicate_item_pagination": {
+  "file": "src-tauri/src/commands/syndicate_item.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "SyndicateItemPaginationQueryDto"
+   }
+  },
+  "returns": "Result<PaginatedResult<syndicate_item::Model>, Error>"
+ },
+ "get_syndicate_item_status_counts": {
+  "file": "src-tauri/src/commands/syndicate_item.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "SyndicateItemPaginationQueryDto"
+   }
+  },
+  "returns": "Result<HashMap<String, usize>, Error>"
+ },
+ "get_syndicate_item_syndicate_counts": {
+  "file": "src-tauri/src/commands/syndicate_item.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "SyndicateItemPaginationQueryDto"
+   }
+  },
+  "returns": "Result<HashMap<String, usize>, Error>"
+ },
+ "get_trade_entry_pagination": {
+  "file": "src-tauri/src/commands/trade_entry.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "TradeEntryPaginationQueryDto"
+   }
+  },
+  "returns": "Result<PaginatedResult<Model>, Error>"
+ },
+ "get_transaction_financial_report": {
+  "file": "src-tauri/src/commands/transaction.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "TransactionPaginationQueryDto"
+   }
+  },
+  "returns": "Result<FinancialReport, Error>"
+ },
+ "get_transaction_pagination": {
+  "file": "src-tauri/src/commands/transaction.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "TransactionPaginationQueryDto"
+   }
+  },
+  "returns": "Result<PaginatedResult<transaction::Model>, Error>"
+ },
+ "get_user_activity": {
+  "file": "src-tauri/src/commands/market.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "UserActiveHistoryQueryDto"
+   }
+  },
+  "returns": "Result<UserActivityDto, Error>"
+ },
+ "get_wfm_auction_by_id": {
+  "file": "src-tauri/src/commands/auction.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "operations": {
+    "optional": true,
+    "kind": "array",
+    "rust": "Option<Vec<String>>"
+   }
+  },
+  "returns": "Result<Auction, Error>"
+ },
+ "get_wfm_auctions_overview": {
+  "file": "src-tauri/src/commands/auction.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "WfmAuctionPaginationQueryDto"
+   }
+  },
+  "returns": "Result<(i64, i32, i64), Error>"
+ },
+ "get_wfm_auctions_pagination": {
+  "file": "src-tauri/src/commands/auction.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "WfmAuctionPaginationQueryDto"
+   }
+  },
+  "returns": "Result<PaginatedResult<Auction>, Error>"
+ },
+ "get_wfm_order_by_id": {
+  "file": "src-tauri/src/commands/order.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "operations": {
+    "optional": true,
+    "kind": "array",
+    "rust": "Option<Vec<String>>"
+   }
+  },
+  "returns": "Result<Order, Error>"
+ },
+ "get_wfm_orders_pagination": {
+  "file": "src-tauri/src/commands/order.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "WfmOrderPaginationQueryDto"
+   }
+  },
+  "returns": "Result<PaginatedResult<Order>, Error>"
+ },
+ "get_wfm_orders_status_counts": {
+  "file": "src-tauri/src/commands/order.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "WfmOrderPaginationQueryDto"
+   }
+  },
+  "returns": "Result<HashMap<String, (usize, i64, f64)>, Error>"
+ },
+ "get_wish_list_financial_report": {
+  "file": "src-tauri/src/commands/wish_list.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "WishListPaginationQueryDto"
+   }
+  },
+  "returns": "Result<FinancialReport, Error>"
+ },
+ "get_wish_list_pagination": {
+  "file": "src-tauri/src/commands/wish_list.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "WishListPaginationQueryDto"
+   }
+  },
+  "returns": "Result<PaginatedResult<Model>, Error>"
+ },
+ "get_wish_list_status_counts": {
+  "file": "src-tauri/src/commands/wish_list.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "WishListPaginationQueryDto"
+   }
+  },
+  "returns": "Result<HashMap<String, usize>, Error>"
+ },
+ "handles_handle_items": {
+  "file": "src-tauri/src/commands/handlers.rs",
+  "args": {
+   "items": {
+    "optional": false,
+    "kind": "array",
+    "rust": "Vec<ItemEntity>"
+   }
+  },
+  "returns": "Result<i32, Error>"
+ },
+ "initialized": {
+  "file": "src-tauri/src/commands/app.rs",
+  "args": {},
+  "returns": "Result<bool, Error>"
+ },
+ "item_price_lookup": {
+  "file": "src-tauri/src/commands/item.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   }
+  },
+  "returns": "Result<ItemPriceDetails, Error>"
+ },
+ "item_prices_lookup": {
+  "file": "src-tauri/src/commands/item.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "ItemPricePaginationQueryDto"
+   }
+  },
+  "returns": "Result<Paginated<ItemPrice>, Error>"
+ },
+ "live_scraper_get_interesting_wtb_items": {
+  "file": "src-tauri/src/commands/live_scraper.rs",
+  "args": {
+   "settings": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "ItemSettings"
+   }
+  },
+  "returns": "Result<Vec<ItemPriceInfo>, Error>"
+ },
+ "live_scraper_get_state": {
+  "file": "src-tauri/src/commands/live_scraper.rs",
+  "args": {},
+  "returns": "Result<Value, Error>"
+ },
+ "live_scraper_toggle": {
+  "file": "src-tauri/src/commands/live_scraper.rs",
+  "args": {},
+  "returns": "Result<(), Error>"
+ },
+ "log": {
+  "file": "src-tauri/src/commands/logs.rs",
+  "args": {
+   "cause": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "component": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "location": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "logLevel": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "message": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "context": {
+    "optional": true,
+    "kind": "any",
+    "rust": "Option<Value>"
+   }
+  },
+  "returns": "Result<(), Error>"
+ },
+ "log_export": {
+  "file": "src-tauri/src/commands/logs.rs",
+  "args": {},
+  "returns": "Result<String, Error>"
+ },
+ "order_delete_all": {
+  "file": "src-tauri/src/commands/order.rs",
+  "args": {
+   "orderType": {
+    "optional": true,
+    "kind": "object-or-enum",
+    "rust": "Option<OrderType>"
+   }
+  },
+  "returns": "Result<(), Error>"
+ },
+ "order_delete_by_id": {
+  "file": "src-tauri/src/commands/order.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   }
+  },
+  "returns": "Result<(), Error>"
+ },
+ "order_refresh": {
+  "file": "src-tauri/src/commands/order.rs",
+  "args": {},
+  "returns": "Result<(), Error>"
+ },
+ "riven_price_predict": {
+  "file": "src-tauri/src/commands/riven_pricer.rs",
+  "args": {
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "RivenPriceInput"
+   }
+  },
+  "returns": "Result<Option<RivenPriceEstimate>, Error>"
+ },
+ "riven_pricer_available": {
+  "file": "src-tauri/src/commands/riven_pricer.rs",
+  "args": {},
+  "returns": "Result<bool, Error>"
+ },
+ "riven_pricer_reload": {
+  "file": "src-tauri/src/commands/riven_pricer.rs",
+  "args": {},
+  "returns": "Result<bool, Error>"
+ },
+ "riven_prices_lookup": {
+  "file": "src-tauri/src/commands/riven.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "RivenPricePaginationQueryDto"
+   }
+  },
+  "returns": "Result<Paginated<RivenPrice>, Error>"
+ },
+ "sound_add_custom_sound": {
+  "file": "src-tauri/src/commands/sound.rs",
+  "args": {
+   "name": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "filePath": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   }
+  },
+  "returns": "Result<Vec<CustomSound>, Error>"
+ },
+ "sound_delete_custom_sound": {
+  "file": "src-tauri/src/commands/sound.rs",
+  "args": {
+   "fileName": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   }
+  },
+  "returns": "Result<Vec<CustomSound>, Error>"
+ },
+ "sound_get_custom_sounds": {
+  "file": "src-tauri/src/commands/sound.rs",
+  "args": {},
+  "returns": "Result<Vec<CustomSound>, Error>"
+ },
+ "sound_get_custom_sounds_path": {
+  "file": "src-tauri/src/commands/sound.rs",
+  "args": {},
+  "returns": "Result<String, Error>"
+ },
+ "stock_item_create": {
+  "file": "src-tauri/src/commands/stock_item.rs",
+  "args": {
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "CreateStockItem"
+   }
+  },
+  "returns": "Result<stock_item::Model, Error>"
+ },
+ "stock_item_delete": {
+  "file": "src-tauri/src/commands/stock_item.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   }
+  },
+  "returns": "Result<stock_item::Model, Error>"
+ },
+ "stock_item_delete_multiple": {
+  "file": "src-tauri/src/commands/stock_item.rs",
+  "args": {
+   "ids": {
+    "optional": false,
+    "kind": "array",
+    "rust": "Vec<i64>"
+   }
+  },
+  "returns": "Result<i64, Error>"
+ },
+ "stock_item_get_by_id": {
+  "file": "src-tauri/src/commands/stock_item.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   },
+   "operations": {
+    "optional": true,
+    "kind": "array",
+    "rust": "Option<Vec<String>>"
+   }
+  },
+  "returns": "Result<stock_item::Model, Error>"
+ },
+ "stock_item_sell": {
+  "file": "src-tauri/src/commands/stock_item.rs",
+  "args": {
+   "wfmUrl": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "subType": {
+    "optional": true,
+    "kind": "object-or-enum",
+    "rust": "Option<SubType>"
+   },
+   "quantity": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   },
+   "price": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   }
+  },
+  "returns": "Result<stock_item::Model, Error>"
+ },
+ "stock_item_update": {
+  "file": "src-tauri/src/commands/stock_item.rs",
+  "args": {
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "UpdateStockItem"
+   }
+  },
+  "returns": "Result<stock_item::Model, Error>"
+ },
+ "stock_item_update_multiple": {
+  "file": "src-tauri/src/commands/stock_item.rs",
+  "args": {
+   "ids": {
+    "optional": false,
+    "kind": "array",
+    "rust": "Vec<i64>"
+   },
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "UpdateStockItem"
+   }
+  },
+  "returns": "Result<Vec<stock_item::Model>, Error>"
+ },
+ "stock_riven_create": {
+  "file": "src-tauri/src/commands/stock_riven.rs",
+  "args": {
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "CreateStockRiven"
+   }
+  },
+  "returns": "Result<stock_riven::Model, Error>"
+ },
+ "stock_riven_delete": {
+  "file": "src-tauri/src/commands/stock_riven.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   }
+  },
+  "returns": "Result<stock_riven::Model, Error>"
+ },
+ "stock_riven_delete_multiple": {
+  "file": "src-tauri/src/commands/stock_riven.rs",
+  "args": {
+   "ids": {
+    "optional": false,
+    "kind": "array",
+    "rust": "Vec<i64>"
+   }
+  },
+  "returns": "Result<i64, Error>"
+ },
+ "stock_riven_get_by_id": {
+  "file": "src-tauri/src/commands/stock_riven.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   },
+   "operations": {
+    "optional": true,
+    "kind": "array",
+    "rust": "Option<Vec<String>>"
+   }
+  },
+  "returns": "Result<stock_riven::Model, Error>"
+ },
+ "stock_riven_sell": {
+  "file": "src-tauri/src/commands/stock_riven.rs",
+  "args": {
+   "wfmUrl": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "modName": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "masteryRank": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   },
+   "rank": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   },
+   "reRolls": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   },
+   "polarity": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "attributes": {
+    "optional": false,
+    "kind": "array",
+    "rust": "Vec<RivenAttribute>"
+   },
+   "price": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   }
+  },
+  "returns": "Result<stock_riven::Model, Error>"
+ },
+ "stock_riven_update": {
+  "file": "src-tauri/src/commands/stock_riven.rs",
+  "args": {
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "UpdateStockRiven"
+   }
+  },
+  "returns": "Result<stock_riven::Model, Error>"
+ },
+ "stock_riven_update_multiple": {
+  "file": "src-tauri/src/commands/stock_riven.rs",
+  "args": {
+   "ids": {
+    "optional": false,
+    "kind": "array",
+    "rust": "Vec<i64>"
+   },
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "UpdateStockRiven"
+   }
+  },
+  "returns": "Result<Vec<stock_riven::Model>, Error>"
+ },
+ "syndicate_item_create": {
+  "file": "src-tauri/src/commands/syndicate_item.rs",
+  "args": {
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "CreateSyndicateItem"
+   }
+  },
+  "returns": "Result<syndicate_item::Model, Error>"
+ },
+ "syndicate_item_delete": {
+  "file": "src-tauri/src/commands/syndicate_item.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   }
+  },
+  "returns": "Result<syndicate_item::Model, Error>"
+ },
+ "syndicate_item_delete_multiple": {
+  "file": "src-tauri/src/commands/syndicate_item.rs",
+  "args": {
+   "ids": {
+    "optional": false,
+    "kind": "array",
+    "rust": "Vec<i64>"
+   }
+  },
+  "returns": "Result<i64, Error>"
+ },
+ "syndicate_item_get_by_id": {
+  "file": "src-tauri/src/commands/syndicate_item.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   },
+   "operations": {
+    "optional": true,
+    "kind": "array",
+    "rust": "Option<Vec<String>>"
+   }
+  },
+  "returns": "Result<syndicate_item::Model, Error>"
+ },
+ "syndicate_item_import_items": {
+  "file": "src-tauri/src/commands/syndicate_item.rs",
+  "args": {},
+  "returns": "Result<i64, Error>"
+ },
+ "syndicate_item_prices_lookup": {
+  "file": "src-tauri/src/commands/syndicate_price.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "SyndicateItemPricePaginationQueryDto"
+   }
+  },
+  "returns": "Result<Paginated<SyndicateItemPrice>, Error>"
+ },
+ "syndicate_item_sell": {
+  "file": "src-tauri/src/commands/syndicate_item.rs",
+  "args": {
+   "wfmUrl": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "subType": {
+    "optional": true,
+    "kind": "object-or-enum",
+    "rust": "Option<SubType>"
+   },
+   "rawSyndicate": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "price": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   }
+  },
+  "returns": "Result<syndicate_item::Model, Error>"
+ },
+ "syndicate_item_update": {
+  "file": "src-tauri/src/commands/syndicate_item.rs",
+  "args": {
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "UpdateSyndicateItem"
+   }
+  },
+  "returns": "Result<syndicate_item::Model, Error>"
+ },
+ "syndicate_item_update_multiple": {
+  "file": "src-tauri/src/commands/syndicate_item.rs",
+  "args": {
+   "ids": {
+    "optional": false,
+    "kind": "array",
+    "rust": "Vec<i64>"
+   },
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "UpdateSyndicateItem"
+   }
+  },
+  "returns": "Result<Vec<syndicate_item::Model>, Error>"
+ },
+ "track_event": {
+  "file": "src-tauri/src/commands/analytics.rs",
+  "args": {
+   "key": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "value": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "HashMap<String, String>"
+   }
+  },
+  "returns": "Result<(), Error>"
+ },
+ "trade_entry_create": {
+  "file": "src-tauri/src/commands/trade_entry.rs",
+  "args": {
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "CreateTradeEntry"
+   }
+  },
+  "returns": "Result<Model, Error>"
+ },
+ "trade_entry_create_multiple": {
+  "file": "src-tauri/src/commands/trade_entry.rs",
+  "args": {
+   "inputs": {
+    "optional": false,
+    "kind": "array",
+    "rust": "Vec<CreateTradeEntry>"
+   }
+  },
+  "returns": "Result<i64, Error>"
+ },
+ "trade_entry_delete": {
+  "file": "src-tauri/src/commands/trade_entry.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   }
+  },
+  "returns": "Result<Model, Error>"
+ },
+ "trade_entry_delete_multiple": {
+  "file": "src-tauri/src/commands/trade_entry.rs",
+  "args": {
+   "ids": {
+    "optional": false,
+    "kind": "array",
+    "rust": "Vec<i64>"
+   }
+  },
+  "returns": "Result<i64, Error>"
+ },
+ "trade_entry_get_by_id": {
+  "file": "src-tauri/src/commands/trade_entry.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   }
+  },
+  "returns": "Result<Model, Error>"
+ },
+ "trade_entry_update": {
+  "file": "src-tauri/src/commands/trade_entry.rs",
+  "args": {
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "UpdateTradeEntry"
+   }
+  },
+  "returns": "Result<Model, Error>"
+ },
+ "trade_entry_update_multiple": {
+  "file": "src-tauri/src/commands/trade_entry.rs",
+  "args": {
+   "ids": {
+    "optional": false,
+    "kind": "array",
+    "rust": "Vec<i64>"
+   },
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "UpdateTradeEntry"
+   }
+  },
+  "returns": "Result<Vec<Model>, Error>"
+ },
+ "transaction_calculate_tax": {
+  "file": "src-tauri/src/commands/transaction.rs",
+  "args": {},
+  "returns": "Result<(), Error>"
+ },
+ "transaction_delete": {
+  "file": "src-tauri/src/commands/transaction.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   }
+  },
+  "returns": "Result<transaction::Model, Error>"
+ },
+ "transaction_delete_bulk": {
+  "file": "src-tauri/src/commands/transaction.rs",
+  "args": {
+   "ids": {
+    "optional": false,
+    "kind": "array",
+    "rust": "Vec<i64>"
+   }
+  },
+  "returns": "Result<u64, Error>"
+ },
+ "transaction_update": {
+  "file": "src-tauri/src/commands/transaction.rs",
+  "args": {
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "UpdateTransaction"
+   }
+  },
+  "returns": "Result<transaction::Model, Error>"
+ },
+ "user_set_status": {
+  "file": "src-tauri/src/commands/user.rs",
+  "args": {
+   "status": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   }
+  },
+  "returns": "Result<(), Error>"
+ },
+ "vt_plat_goal": {
+  "file": "src-tauri/src/commands/void_sell_finder.rs",
+  "args": {},
+  "returns": "Result<PlatGoal, Error>"
+ },
+ "vt_riven_market_scan": {
+  "file": "src-tauri/src/commands/void_riven_market.rs",
+  "args": {},
+  "returns": "Result<RivenMarketStatus, Error>"
+ },
+ "vt_riven_market_status": {
+  "file": "src-tauri/src/commands/void_riven_market.rs",
+  "args": {},
+  "returns": "Result<RivenMarketStatus, Error>"
+ },
+ "vt_riven_market_stop": {
+  "file": "src-tauri/src/commands/void_riven_market.rs",
+  "args": {},
+  "returns": "Result<RivenMarketStatus, Error>"
+ },
+ "vt_riven_price_history": {
+  "file": "src-tauri/src/commands/void_riven_market.rs",
+  "args": {
+   "wfmUrl": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   }
+  },
+  "returns": "Result<Vec<RivenPrice>, Error>"
+ },
+ "vt_riven_prices_export": {
+  "file": "src-tauri/src/commands/void_riven_market.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "VtRivenQuery"
+   }
+  },
+  "returns": "Result<String, Error>"
+ },
+ "vt_riven_prices_lookup": {
+  "file": "src-tauri/src/commands/void_riven_market.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "VtRivenQuery"
+   }
+  },
+  "returns": "Result<VtRivenPage, Error>"
+ },
+ "vt_sell_finder": {
+  "file": "src-tauri/src/commands/void_sell_finder.rs",
+  "args": {
+   "minPrice": {
+    "optional": true,
+    "kind": "int",
+    "rust": "Option<i64>"
+   }
+  },
+  "returns": "Result<SellFinderResult, Error>"
+ },
+ "vt_strategy_set": {
+  "file": "src-tauri/src/commands/void_strategy.rs",
+  "args": {
+   "preset": {
+    "optional": true,
+    "kind": "object-or-enum",
+    "rust": "Option<TradingPreset>"
+   },
+   "smartEnabled": {
+    "optional": true,
+    "kind": "bool",
+    "rust": "Option<bool>"
+   },
+   "strictTiers": {
+    "optional": true,
+    "kind": "bool",
+    "rust": "Option<bool>"
+   },
+   "lockedFields": {
+    "optional": true,
+    "kind": "array",
+    "rust": "Option<Vec<String>>"
+   },
+   "manualPlatinum": {
+    "optional": true,
+    "kind": "int",
+    "rust": "Option<i64>"
+   }
+  },
+  "returns": "Result<StrategyStatus, Error>"
+ },
+ "vt_strategy_status": {
+  "file": "src-tauri/src/commands/void_strategy.rs",
+  "args": {},
+  "returns": "Result<StrategyStatus, Error>"
+ },
+ "wf_inventory_get_rivens": {
+  "file": "src-tauri/src/commands/wf_inventory.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "WFItemPaginationDto"
+   }
+  },
+  "returns": "Result<Value, Error>"
+ },
+ "wf_inventory_get_syndicates": {
+  "file": "src-tauri/src/commands/wf_inventory.rs",
+  "args": {
+   "query": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "WFItemPaginationDto"
+   }
+  },
+  "returns": "Result<Value, Error>"
+ },
+ "wf_inventory_update": {
+  "file": "src-tauri/src/commands/wf_inventory.rs",
+  "args": {},
+  "returns": "Result<(), Error>"
+ },
+ "wfgdpr_get_accounts": {
+  "file": "src-tauri/src/commands/warframe_gdpr.rs",
+  "args": {},
+  "returns": "Result<Value, Error>"
+ },
+ "wfgdpr_get_state": {
+  "file": "src-tauri/src/commands/warframe_gdpr.rs",
+  "args": {},
+  "returns": "Result<Value, Error>"
+ },
+ "wfgdpr_load": {
+  "file": "src-tauri/src/commands/warframe_gdpr.rs",
+  "args": {
+   "filePath": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   }
+  },
+  "returns": "Result<(), Error>"
+ },
+ "wish_list_bought": {
+  "file": "src-tauri/src/commands/wish_list.rs",
+  "args": {
+   "wfmUrl": {
+    "optional": false,
+    "kind": "string",
+    "rust": "String"
+   },
+   "subType": {
+    "optional": true,
+    "kind": "object-or-enum",
+    "rust": "Option<SubType>"
+   },
+   "quantity": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   },
+   "price": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   }
+  },
+  "returns": "Result<Model, Error>"
+ },
+ "wish_list_create": {
+  "file": "src-tauri/src/commands/wish_list.rs",
+  "args": {
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "CreateWishListItem"
+   }
+  },
+  "returns": "Result<Model, Error>"
+ },
+ "wish_list_delete": {
+  "file": "src-tauri/src/commands/wish_list.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   }
+  },
+  "returns": "Result<Model, Error>"
+ },
+ "wish_list_delete_multiple": {
+  "file": "src-tauri/src/commands/wish_list.rs",
+  "args": {
+   "ids": {
+    "optional": false,
+    "kind": "array",
+    "rust": "Vec<i64>"
+   }
+  },
+  "returns": "Result<i64, Error>"
+ },
+ "wish_list_get_by_id": {
+  "file": "src-tauri/src/commands/wish_list.rs",
+  "args": {
+   "id": {
+    "optional": false,
+    "kind": "int",
+    "rust": "i64"
+   },
+   "operations": {
+    "optional": true,
+    "kind": "array",
+    "rust": "Option<Vec<String>>"
+   }
+  },
+  "returns": "Result<wish_list::Model, Error>"
+ },
+ "wish_list_update": {
+  "file": "src-tauri/src/commands/wish_list.rs",
+  "args": {
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "UpdateWishList"
+   }
+  },
+  "returns": "Result<Model, Error>"
+ },
+ "wish_list_update_multiple": {
+  "file": "src-tauri/src/commands/wish_list.rs",
+  "args": {
+   "ids": {
+    "optional": false,
+    "kind": "array",
+    "rust": "Vec<i64>"
+   },
+   "input": {
+    "optional": false,
+    "kind": "object-or-enum",
+    "rust": "UpdateWishList"
+   }
+  },
+  "returns": "Result<Vec<Model>, Error>"
+ }
+}

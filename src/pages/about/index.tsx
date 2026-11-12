@@ -51,8 +51,8 @@ export default function AboutPage() {
     useTranslatePage(`text.${key}`, { ...context }, i18Key);
 
   return (
-    <Box p={"md"}>
-      <Center w={"100%"} h={"80vh"}>
+    <Box p={"md"} style={{ height: "calc(var(--vt-vh, 100vh) - 65px)", overflowY: "auto" }}>
+      <Center w={"100%"} mih={"80vh"}>
         <Stack gap={"lg"} align={"center"}>
           <Group grow gap={"5vw"}>
             <InfoCard link="https://quantframe.app" icon={<FontAwesomeIcon size="5x" icon={faBookOpen} />} title={useTranslateCards("guide.title")} />

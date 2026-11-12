@@ -5,14 +5,16 @@ import { SettingsForm } from "@components/Forms/Settings";
 import { useAppContext } from "@contexts/app.context";
 import { useAuthContext } from "@contexts/auth.context";
 import { useLiveScraperContext } from "@contexts/liveScraper.context";
+import { useHasAlert } from "@hooks/useHasAlert.hook";
 import { useTranslateCommon, useTranslateComponent, useTranslateEnums } from "@hooks/useTranslate.hook";
 import { Avatar, Box, Button, Group, Stack, Text } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import { notifications } from "@mantine/notifications";
 import i18next from "i18next";
-import { Suspense, lazy, useCallback, useMemo, useState, type ReactNode } from "react";
+import { Suspense, lazy, useCallback, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import StationCore, { type StationHost } from "./StationCore";
+import { errorText } from "./data/bridge";
 import type { PanelId } from "./ui/panels";
 
 /**
@@ -143,6 +145,7 @@ export default function StationPage() {
   const { settings } = useAppContext();
   const { user } = useAuthContext();
   const navigate = useNavigate();
+  const hasAlert = useHasAlert();
 
   const autoDelete = Boolean(settings?.live_scraper?.general?.auto_delete);
 
@@ -150,7 +153,7 @@ export default function StationPage() {
   const toggleTrader = useCallback(() => {
     const t = (key: string) => useTranslateComponent(`live_scraper_control.${key}`);
     const toggle = () =>
-      api.live_scraper.toggle().catch(() => notifications.show({ title: t("errors.login.title"), message: t("errors.login.message"), color: "red.7" }));
+      api.live_scraper.toggle().catch((e) => notifications.show({ title: "The live trader did not switch", message: errorText(e), color: "red.7" }));
     if (!is_running && autoDelete) {
       modals.openConfirmModal({
         title: t("prompts.start.title"),
@@ -220,5 +223,10 @@ export default function StationPage() {
     [is_running, statusLine, autoDelete, toggleTrader, renderPanel, renderStrategy, classic, user?.unread_messages],
   );
 
-  return <StationCore host={host} />;
+  // The alert ticker (40px) floats over the top of every page when there is an alert.
+  return (
+    <div style={hasAlert ? ({ "--vt-station-top": "40px" } as CSSProperties) : undefined}>
+      <StationCore host={host} />
+    </div>
+  );
 }

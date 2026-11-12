@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Tooltip, UnstyledButton, Stack } from "@mantine/core";
+import { useLocation } from "react-router-dom";
 import classes from "./NavbarMinimalColored.module.css";
 
 export type NavbarLinkProps = {
@@ -44,7 +45,13 @@ export interface NavbarMinimalColoredProps {
 }
 
 export function NavbarMinimalColored({ links }: NavbarMinimalColoredProps) {
-  const [active, setActive] = useState("home");
+  const [clicked, setActive] = useState("home");
+  // Void Trader: the highlighted entry follows the route, so it is also right after a redirect
+  // (the app can start in the station) and after leaving a page without using this bar.
+  const { pathname } = useLocation();
+  const path = pathname.replace(/^\/+|\/+$/g, "");
+  const routed = links.find((link) => !link.web && !link.hide && link.link.replace(/^\/+|\/+$/g, "") === path);
+  const active = routed?.id ?? clicked;
 
   const GetActiveLinkByAlign = (align: "top" | "bottom") => {
     if (!links) return <></>;

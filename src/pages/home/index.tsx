@@ -1,4 +1,4 @@
-import { Container, Text, Divider, Grid, Group, Paper, ScrollArea, useMantineTheme } from "@mantine/core";
+import { Box, Container, Text, Divider, Grid, Group, Paper, ScrollArea, useMantineTheme } from "@mantine/core";
 import api from "@api/index";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBoxOpen, faCalendarAlt, faMoneyBill } from "@fortawesome/free-solid-svg-icons";
@@ -31,9 +31,12 @@ export default function HomePage() {
   // Use the custom hook for Tauri events
   useTauriEvent(TauriTypes.Events.RefreshTransactions, handleRefresh, []);
   return (
-    <Container size={"100%"}>
-      <PlatGoalBar />
-      <Grid className={classes.wrapper} data-has-alert={useHasAlert()}>
+    <Container size={"100%"} className={classes.page}>
+      {/* the alert ticker floats over the top of the page: keep the plat goal bar clear of it */}
+      <Box className={classes.wrapper} data-has-alert={useHasAlert()}>
+        <PlatGoalBar />
+      </Box>
+      <Grid>
         <Grid.Col span={4}>
           <StatsWithIcon
             count={summary?.total.total_profit || 0}

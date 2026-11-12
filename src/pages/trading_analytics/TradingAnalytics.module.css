@@ -8,7 +8,7 @@
 
 .databaseTransactions {
   --offset: 267px;
-  height: calc(100vh - var(--offset)) !important;
+  height: calc(var(--vt-vh, 100vh) - var(--offset)) !important;
   transition: height 0.2s ease;
 
   &.alert {
@@ -26,7 +26,8 @@
 
 .databaseItem {
   --offset: 230px;
-  height: calc(100vh - var(--offset)) !important;
+  /* --vt-above-h: extra content a tab puts above its table (Void Trader's riven scan bar) */
+  height: calc(var(--vt-vh, 100vh) - var(--offset) - var(--vt-above-h, 0px)) !important;
   transition: height 0.2s ease;
 
   &.alert {
@@ -44,7 +45,7 @@
 
 .databaseTradingPartners {
   --offset: 500px;
-  height: calc(100vh - var(--offset)) !important;
+  height: calc(var(--vt-vh, 100vh) - var(--offset)) !important;
   transition: height 0.2s ease;
 
   &.alert {
@@ -62,7 +63,7 @@
 
 .databaseSyndicate {
   --offset: 230px;
-  height: calc(100vh - var(--offset)) !important;
+  height: calc(var(--vt-vh, 100vh) - var(--offset)) !important;
   transition: height 0.2s ease;
 
   &.alert {

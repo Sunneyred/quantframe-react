@@ -2,7 +2,8 @@ import { LiveScraperControl } from "@components/Forms/LiveScraperControl";
 import { useHasAlert } from "@hooks/useHasAlert.hook";
 import { useTranslatePages } from "@hooks/useTranslate.hook";
 import { Box, Container, Tabs } from "@mantine/core";
-import { useLocalStorage } from "@mantine/hooks";
+import { useElementSize, useLocalStorage } from "@mantine/hooks";
+import type { CSSProperties } from "react";
 import classes from "./LiveScraper.module.css";
 import { ItemPanel, RivenPanel, SyndicatePanel, WishListPanel } from "./Tabs";
 import { StrategyPanel } from "./StrategyPanel";
@@ -38,17 +39,21 @@ export default function LiveScraperPage() {
     },
   ];
 
+  const { ref: strategyRef, height: strategyHeight } = useElementSize();
   const [activeTab, setActiveTab] = useLocalStorage<string>({
     key: "live_scraper.active_tab",
     defaultValue: tabs[0].id,
   });
 
   return (
-    <Container size={"100%"}>
+    <Container size={"100%"} className={classes.page} style={{ "--vt-strategy-h": `${Math.ceil(strategyHeight)}px` } as CSSProperties}>
       <Box data-has-alert={useHasAlert()} className={classes.liveScraper}>
         <LiveScraperControl />
       </Box>
-      <StrategyPanel />
+      {/* measured, so the tables below give up exactly the room the strategy panel takes */}
+      <div ref={strategyRef} className={classes.strategy}>
+        <StrategyPanel />
+      </div>
       <Tabs value={activeTab} onChange={(value) => setActiveTab(value || tabs[0].id)}>
         <Tabs.List>
           {tabs

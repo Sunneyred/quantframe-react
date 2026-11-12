@@ -425,8 +425,9 @@ export async function sellStockItem(item: StockItem, price: number, quantity: nu
     demoSale(price * quantity);
     return;
   }
-  // same payload as the manual sell prompt in Live Trading > Items
-  await mod.default.stock_item.sell({ id: item.id, wfm_url: item.wfm_url, sub_type: item.sub_type, price, quantity });
+  // Same payload as the manual sell prompt in Live Trading > Items. The backend's `price` is the
+  // total for the whole trade (it divides by the quantity), the card asks for the price of one.
+  await mod.default.stock_item.sell({ id: item.id, wfm_url: item.wfm_url, sub_type: item.sub_type, price: price * quantity, quantity });
 }
 
 export async function updateStockItem(input: TauriTypes.UpdateStockItem): Promise<void> {
@@ -507,7 +508,8 @@ export async function boughtWish(wish: WishItem, price: number, quantity: number
     if (it.quantity <= 0) demoWishes = demoWishes.filter((i) => i.id !== wish.id);
     return;
   }
-  await mod.default.wish_list.bought({ id: wish.id, wfm_url: wish.wfm_url, sub_type: wish.sub_type, price, quantity });
+  // as with selling: the backend takes the total paid for the whole trade
+  await mod.default.wish_list.bought({ id: wish.id, wfm_url: wish.wfm_url, sub_type: wish.sub_type, price: price * quantity, quantity });
 }
 
 export async function updateWish(input: TauriTypes.UpdateWishListItem): Promise<void> {

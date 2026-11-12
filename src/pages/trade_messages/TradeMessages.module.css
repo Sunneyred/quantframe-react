@@ -9,7 +9,7 @@
 
 .databaseItem {
   --offset: 305px;
-  height: calc(100vh - var(--offset)) !important;
+  height: calc(var(--vt-vh, 100vh) - var(--offset)) !important;
   transition: height 0.2s ease;
 
   &.alert {

@@ -48,7 +48,7 @@ export const UserPanel = ({ isActive }: UserPanelProps = {}) => {
     <Box p={"md"} pos={"relative"}>
       <PatreonOverlay permission={TauriTypes.PermissionsFlags.WFM_USER_ACTIVE_HISTORY} tier="T1+" />
       <Grid>
-        <Grid.Col span={9} style={{ position: "relative", height: "100vh" }}>
+        <Grid.Col span={9} style={{ position: "relative", height: "var(--vt-vh, 100vh)" }}>
           <Bar
             style={{
               border: `1px solid ${theme.colors.gray[3]}`,

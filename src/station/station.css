@@ -2,7 +2,10 @@
 
 .vt-station-root {
   position: relative;
-  height: calc(100vh - 65px - 2 * var(--mantine-spacing-md, 16px));
+  /* --vt-station-top: room kept free above the station for the app's alert ticker, which
+     floats over the top of the page and would cover (and take the clicks of) a panel's title bar */
+  margin-top: var(--vt-station-top, 0px);
+  height: calc(100vh - 65px - max(2 * var(--mantine-spacing-md, 16px), var(--vt-station-top, 0px)));
   min-height: 240px;
   display: flex;
   flex-direction: column;
@@ -651,6 +654,11 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+  /* The app's pages size their tables as "window height minus what is above them", and what is
+     above them includes the 65px app header. Inside a panel the room they have is the panel
+     body, so tell them the window is that tall (plus the header they subtract). */
+  container-type: size;
+  --vt-vh: calc(100cqh + 65px);
 }
 
 /* --- overlays above everything: map, palette, help --- */

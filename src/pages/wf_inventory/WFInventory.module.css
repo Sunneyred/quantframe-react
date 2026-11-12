@@ -5,5 +5,10 @@
 }
 
 .veiledRivens {
-  height: calc(100vh - 300px);
+  height: calc(var(--vt-vh, 100vh) - 300px);
+
+  /* the container moves down 30px when the alert ticker is showing */
+  &[data-has-alert="true"] {
+    height: calc(var(--vt-vh, 100vh) - 330px);
+  }
 }

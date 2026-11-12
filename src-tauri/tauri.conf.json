@@ -24,13 +24,13 @@
   },
   "productName": "Void Trader",
   "mainBinaryName": "VoidTrader",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "identifier": "dev.kenya.quantframe",
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ3NEIwMTI1MzA3Q0E1OEYKUldTUHBYd3dKUUZMMTczQ2pIYTR0bklLQXlaMkxvK0V0a0RMQytNMTdqZzBCWitQRnNIWDhxYnAK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQzQjRGNDk0REJFM0U1NTYKUldSVzVlUGJsUFMwUXd2VzZKRHlqRXNUNXZCRitoOE1FWE5vN0tjOThieFZ1Ny80M0FYNXJOQncK",
       "endpoints": [
-        "https://github.com/Sunneyred/quantframe-react/releases/latest/download/latest.json"
+        "https://raw.githubusercontent.com/Sunneyred/quantframe-react/void-trader/latest.json"
       ]
     }
   },

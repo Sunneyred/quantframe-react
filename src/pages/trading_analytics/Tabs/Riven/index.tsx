@@ -1,5 +1,6 @@
 import { Box, Group, NumberFormatter, Paper, SimpleGrid } from "@mantine/core";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
+import { useElementSize } from "@mantine/hooks";
 import { QuantframeApiTypes } from "$types";
 import { useQueries } from "./queries";
 import { SearchField } from "@components/Forms/SearchField";
@@ -69,10 +70,14 @@ export const RivenPanel = ({ isActive }: RivenPanelProps = {}) => {
   }, [dates]);
 
   const IsLoading = () => (paginationQuery.isFetching || exportMutation.isPending) && isActive && canUse;
+  const { ref: barRef, height: barHeight } = useElementSize();
 
   return (
-    <Box p={"md"} pos={"relative"}>
-      <RivenMarketBar onScanComplete={() => refetchQueries()} />
+    <Box p={"md"} pos={"relative"} style={{ "--vt-above-h": `${Math.ceil(barHeight)}px` } as CSSProperties}>
+      {/* measured, so the table below gives up exactly the room the scan bar takes */}
+      <div ref={barRef} style={{ display: "flow-root" }}>
+        <RivenMarketBar onScanComplete={() => refetchQueries()} />
+      </div>
       <SearchField
         value={queryData.values.query || ""}
         onSearch={() => {

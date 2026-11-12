@@ -32,3 +32,5 @@ __trace/
 
 build/
 .pnpm-store
+__pycache__/
+tools/harness/shots/

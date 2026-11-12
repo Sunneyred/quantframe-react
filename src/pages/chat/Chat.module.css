@@ -7,9 +7,10 @@
 
 .chats {
   --offset: 220px;
-  height: calc(100vh - var(--offset));
+  height: calc(var(--vt-vh, 100vh) - var(--offset));
 
+  /* the container moves down 50px when the alert ticker is showing: the list gets shorter, not taller */
   &[data-has-alert="true"] {
-    --offset: 200px;
+    --offset: 270px;
   }
 }

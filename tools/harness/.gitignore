@@ -1,0 +1,4 @@
+shots/
+.server-*.log
+last-report.json
+__pycache__/

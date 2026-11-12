@@ -109,7 +109,7 @@ export const ChatRome = ({ chat, goBack, disableChat }: ChatRomeProps) => {
         {isFetching && <Loading />}
         <ScrollArea.Autosize
           p={10}
-          h={`calc(100vh - ${useHasAlert() ? "280px" : "260px"})`}
+          h={`calc(var(--vt-vh, 100vh) - ${useHasAlert() ? "280px" : "260px"})`}
           scrollbarSize={1}
           onBottomReached={() => setAtBottom(true)}
           onScrollPositionChange={(position) => {

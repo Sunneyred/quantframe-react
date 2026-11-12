@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - void-trader
+    paths-ignore:
+      - latest.json
     tags:
       - "v*"
   workflow_dispatch:

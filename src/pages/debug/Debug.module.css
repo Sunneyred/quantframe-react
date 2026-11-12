@@ -11,7 +11,7 @@
 .databaseLogging,
 .dataTableEELog {
   --offset: 300px;
-  height: calc(100vh - var(--offset)) !important;
+  height: calc(var(--vt-vh, 100vh) - var(--offset)) !important;
 
   &[data-alert="true"] {
     --offset: 350px;
