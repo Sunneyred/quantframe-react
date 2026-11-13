@@ -47,6 +47,8 @@ export interface EngineEvents {
   /** Debug keys (G sale, B buyer, N notification). */
   debug: "sale" | "buyer" | "notify";
   stats: EngineStats;
+  /** The frame loop threw on many frames in a row: the game cannot run (the shell falls back to classic). */
+  fault: string;
 }
 
 export interface EngineStats {
@@ -336,12 +338,24 @@ export class Engine {
     else this.start();
   };
 
+  private faults = 0;
   private frame = (now: number) => {
     if (!this.running) return;
     this.raf = requestAnimationFrame(this.frame);
     const dt = Math.min(0.05, Math.max(0, (now - this.last) / 1000));
     this.last = now;
-    this.step(dt);
+    try {
+      this.step(dt);
+      this.faults = 0;
+    } catch (e) {
+      // one bad frame is survivable; a frame that throws every time is a dead game
+      if (++this.faults === 1) console.error("[game] frame failed", e);
+      if (this.faults >= 30) {
+        this.stop();
+        this.events.emit("fault", e instanceof Error ? e.message : String(e));
+      }
+      return;
+    }
     const ms = performance.now() - now;
     const acc = this.statAcc;
     acc.frames++;

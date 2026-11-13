@@ -105,13 +105,13 @@ export function buildServiceDeck(engine: Engine): ServiceDeck {
     g.rotation.y = faceCentre(deg);
     root.add(g);
     // the lectern: body, gold top, a glowing lip toward the room, an arm holding the display
-    const body = new THREE.Mesh(new THREE.BoxGeometry(STATION_W, 0.84, 0.5), p.pearlPlain);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(STATION_W, 0.84, 0.5), p.wood);
     body.position.y = 0.42;
     g.add(body);
     const top = new THREE.Mesh(new THREE.BoxGeometry(STATION_W + 0.05, 0.05, 0.57), p.gold);
     top.position.y = 0.865;
     g.add(top);
-    const lip = new THREE.Mesh(new THREE.BoxGeometry(STATION_W - 0.1, 0.018, 0.02), p.cyanGlow);
+    const lip = new THREE.Mesh(new THREE.BoxGeometry(STATION_W - 0.1, 0.018, 0.02), p.warmGlow);
     lip.position.set(0, 0.86, 0.292);
     g.add(lip);
     const band = new THREE.Mesh(new THREE.PlaneGeometry(STATION_W - 0.08, 0.16), p.filigree);

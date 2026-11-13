@@ -137,6 +137,7 @@ export default function GameCore() {
         fallBackToClassic(`no first frame after ${Math.round(limit / 1000)}s`);
       }
     }, 250);
+    const offFault = engine.events.on("fault", (m) => fallBackToClassic(`the game stopped: ${m}`.slice(0, 300)));
     const onContextLost = () => {
       if (!leaving) fallBackToClassic("the graphics context was lost");
     };
@@ -199,6 +200,7 @@ export default function GameCore() {
     return () => {
       leaving = true;
       window.clearInterval(watchdog);
+      offFault();
       engine.renderer.domElement.removeEventListener("webglcontextlost", onContextLost);
       for (const off of offs) off();
       modals.dispose(); // puts Mantine's shared portal node back in <body> before the DOM goes

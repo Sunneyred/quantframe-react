@@ -61,8 +61,8 @@ export function buildAudioProps(engine: Engine): AudioProps {
   deck.rotation.y = Math.atan2(DECK_FACING.x - DECK_AT.x, DECK_FACING.z - DECK_AT.z);
   scene.add(deck);
   const FRONT = 0.23;
-  deck.add(box(0.9, 0.06, 0.52, p.ivory, 0, 0.03, 0));
-  deck.add(box(0.84, 1.18, 0.46, p.pearlPlain, 0, 0.65, 0));
+  deck.add(box(0.9, 0.06, 0.52, p.bakelite, 0, 0.03, 0));
+  deck.add(box(0.84, 1.18, 0.46, p.wood, 0, 0.65, 0));
   deck.add(box(0.9, 0.04, 0.52, p.gold, 0, 1.26, 0));
   deck.add(box(0.76, 0.64, 0.02, p.steel, 0, 0.93, FRONT));
   // speaker: slats of brass over a dark recess
