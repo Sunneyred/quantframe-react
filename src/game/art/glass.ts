@@ -215,6 +215,8 @@ export interface GlassOptions {
   density?: number;
   /** Thin-film iridescence, 0..1. */
   irid?: number;
+  /** Strength of the mirrored environment (1 = full). */
+  spec?: number;
   repeat?: [number, number];
   side?: THREE.Side;
 }
@@ -243,6 +245,7 @@ uniform float uGlow;
 uniform float uOpacity;
 uniform float uDensity;
 uniform float uIrid;
+uniform float uSpec;
 uniform float uTime;
 uniform vec2 uRepeat;
 varying vec3 vN;
@@ -262,8 +265,8 @@ void main() {
   vec3 film = 0.5 + 0.5 * cos(6.2832 * (ndv * 1.3 + pat.a * 0.35 + vec3(0.0, 0.33, 0.67)) + uTime * 0.15);
   float lum = dot(env, vec3(0.3, 0.6, 0.1));
   vec3 spec = env * (0.07 + 0.85 * fres) + env * smoothstep(0.5, 0.95, lum) * 1.3;
-  spec *= mix(vec3(1.0), film * 1.7, uIrid);
-  float a = clamp(uOpacity + pat.a * uDensity + fres * 0.35, 0.0, 0.96);
+  spec *= mix(vec3(1.0), film * 1.7, uIrid) * uSpec;
+  float a = clamp(uOpacity + pat.a * uDensity + fres * 0.35 * uSpec, 0.0, 0.96);
   // lit from within: the middle glows, the rim (more glass along the eye line) is deeper in colour
   vec3 inner = body * uGlow * (0.4 + 0.8 * ndv) + body * body * fres * uGlow * 0.6;
   vec3 col = inner * a + spec + film * uIrid * fres * 0.22;
@@ -284,6 +287,7 @@ export function cheapGlass(shared: GlassShared, o: GlassOptions): THREE.ShaderMa
       uOpacity: { value: o.opacity ?? 0.22 },
       uDensity: { value: o.density ?? 0.55 },
       uIrid: { value: o.irid ?? 0.25 },
+      uSpec: { value: o.spec ?? 1 },
       uRepeat: { value: new THREE.Vector2(...(o.repeat ?? [1, 1])) },
     },
     transparent: true,
@@ -305,7 +309,6 @@ export function heroGlass(o: GlassOptions & { thickness?: number }): THREE.MeshP
     dispersion: 4,
     iridescence: Math.min(1, (o.irid ?? 0.25) * 2),
     iridescenceIOR: 1.33,
-    iridescenceThicknessRange: [180, 520],
     roughness: 0.06,
     metalness: 0,
     attenuationColor: tint,

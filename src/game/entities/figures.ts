@@ -41,6 +41,7 @@ export function makePlayerAvatar(p: Palette): Figure {
   const trousers = new THREE.MeshStandardMaterial({ color: 0x1d6f70, roughness: 0.85 });
   const scarfMat = new THREE.MeshStandardMaterial({ color: 0xb8325a, roughness: 0.9, side: THREE.DoubleSide });
   const cream = p.paint.cream;
+  const sleeve = new THREE.MeshStandardMaterial({ color: 0x8c5228, roughness: 0.55 });
   const uvk = (g: THREE.BufferGeometry, kx: number, ky: number) => {
     const uv = g.attributes.uv as THREE.BufferAttribute;
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * kx, uv.getY(i) * ky);
@@ -48,7 +49,7 @@ export function makePlayerAvatar(p: Palette): Figure {
   };
 
   // torso: a quilted leather jacket, a fleece collar, a brass gauge on the chest, a belt
-  const torso = new THREE.Mesh(uvk(new THREE.LatheGeometry([V(0.0, 0.94), V(0.15, 0.95), V(0.16, 1.02), V(0.19, 1.3), V(0.205, 1.42), V(0.16, 1.52), V(0.07, 1.57), V(0.0, 1.58)], 20), 2, 1.2), jacket);
+  const torso = new THREE.Mesh(uvk(new THREE.LatheGeometry([V(0.0, 0.94), V(0.15, 0.95), V(0.16, 1.02), V(0.19, 1.3), V(0.205, 1.42), V(0.16, 1.52), V(0.07, 1.57), V(0.0, 1.58)], 20), 7, 4), jacket);
   torso.scale.z = 0.72;
   body.add(torso);
   const collar = new THREE.Mesh(new THREE.TorusGeometry(0.105, 0.04, 8, 20), cream);
@@ -117,7 +118,7 @@ export function makePlayerAvatar(p: Palette): Figure {
   const bead = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 6), p.cyanGlow);
   bead.position.y = 0.21;
   halo.add(bead);
-  const bubble = new THREE.Mesh(new THREE.SphereGeometry(0.175, 24, 16), p.glassLike("clear", { opacity: 0.02, density: 0.06, glow: 0.3, irid: 0.25, side: THREE.FrontSide }));
+  const bubble = new THREE.Mesh(new THREE.SphereGeometry(0.175, 24, 16), p.glassLike("clear", { opacity: 0.02, density: 0.04, glow: 0.2, irid: 0.2, spec: 0.3, side: THREE.FrontSide }));
   bubble.position.y = 0.015;
   head.add(bubble);
   const neckRing = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.016, 6, 24), p.brass);
@@ -129,17 +130,17 @@ export function makePlayerAvatar(p: Palette): Figure {
   const arms: THREE.Group[] = [];
   const fores: THREE.Group[] = [];
   for (const side of [-1, 1]) {
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.075, 14, 10), jacket);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.075, 14, 10), sleeve);
     cap.position.set(side * 0.225, 1.47, 0);
     body.add(cap);
     const shoulder = new THREE.Group();
     shoulder.position.set(side * 0.235, 1.46, 0);
     body.add(shoulder);
-    shoulder.add(capsule(0.055, 0.2, jacket));
+    shoulder.add(capsule(0.055, 0.2, sleeve));
     const elbow = new THREE.Group();
     elbow.position.y = -0.3;
     shoulder.add(elbow);
-    elbow.add(capsule(0.048, 0.16, jacket));
+    elbow.add(capsule(0.048, 0.16, sleeve));
     const gauntlet = capsule(0.055, 0.1, cream);
     gauntlet.position.y -= 0.1;
     elbow.add(gauntlet);
@@ -236,6 +237,8 @@ export function makeCustomer(p: Palette, name: string): CustomerFigure {
   const cloth = new THREE.MeshStandardMaterial({ color: tint, roughness: kind === 1 ? 0.32 : 0.85, metalness: kind === 1 ? 0.3 : 0.05, side: THREE.DoubleSide });
   const glow = new THREE.MeshBasicMaterial({ color: accent.clone().multiplyScalar(2.2), toneMapped: false });
   own.push(cloth, glow);
+  const bowl = p.glassLike("clear", { opacity: 0.02, density: 0.04, glow: 0.2, irid: 0.2, spec: 0.3, side: THREE.FrontSide });
+  own.push(bowl);
   const lathe = (pts: THREE.Vector2[], mat: THREE.Material, segs = 24) => new THREE.Mesh(new THREE.LatheGeometry(pts, segs), mat);
   const hoop = (r: number, w: number, y: number, mat: THREE.Material) => {
     const m = new THREE.Mesh(new THREE.TorusGeometry(r, w, 6, 28), mat);
@@ -260,7 +263,7 @@ export function makeCustomer(p: Palette, name: string): CustomerFigure {
     body.add(hoop(0.12, 0.022, 1.52, p.brass));
     const orb = new THREE.Mesh(new THREE.SphereGeometry(0.07, 14, 10), glow);
     head.add(orb);
-    head.add(new THREE.Mesh(new THREE.SphereGeometry(0.17, 20, 14), p.glass.clear));
+    head.add(new THREE.Mesh(new THREE.SphereGeometry(0.17, 20, 14), bowl));
   } else if (kind === 1) {
     // tin robot: an enamel barrel on a skirt, a chrome dome with one dial eye, an aerial
     body.add(lathe([V(0.0, 0.03), V(0.3, 0.03), V(0.33, 0.12), V(0.24, 0.3), V(0.27, 0.5), V(0.3, 1.1), V(0.26, 1.42), V(0.12, 1.5), V(0.0, 1.5)], cloth));

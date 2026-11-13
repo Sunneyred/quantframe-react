@@ -172,7 +172,20 @@ export class Engine {
     return this.time;
   }
 
+  /**
+   * Never serialise the world. Vite's dev client forwards console output by JSON-stringifying its
+   * arguments; a logged DOM node reaches the engine through React, and three's toJSON would write
+   * out every vertex and texture (gigabytes, enough to get the test browser killed).
+   */
+  toJSON() {
+    return {};
+  }
+
   setRoom(room: Room) {
+    const mute = (o: THREE.Object3D) => ((o as { toJSON: unknown }).toJSON = () => ({ object: {} }));
+    mute(this.scene);
+    mute(this.cssScene);
+    for (const c of this.scene.children) mute(c);
     this.room = room;
     applyTier(this.scene, this.quality === "high");
     this.player.place(room.spawn.x, room.spawn.z, room.spawn.yaw);

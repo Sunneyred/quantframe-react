@@ -113,6 +113,10 @@ export class Batch {
       const merged = mergeGeometries(list, false);
       if (!merged) continue;
       const mesh = new THREE.Mesh(merged, mat);
+      // Merged meshes are large and derived: never serialise them. (Vite's dev client forwards console
+      // output by JSON-stringifying its arguments; a logged DOM node reaches the scene through React,
+      // and three's toJSON would then write out every vertex. That took gigabytes in the test harness.)
+      (mesh as { toJSON: unknown }).toJSON = () => ({ object: {} });
       mesh.castShadow = opts.cast ?? false;
       mesh.receiveShadow = opts.receive ?? true;
       parent.add(mesh);

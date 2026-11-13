@@ -151,6 +151,11 @@ export class Palette {
     return cheapGlass(this.glassShared, { ...o, pattern: this.patterns[o.pattern], ...over });
   }
 
+  /** Never serialised (see Engine.toJSON). */
+  toJSON() {
+    return {};
+  }
+
   /** Per frame: the glass's clock. */
   update(t: number) {
     this.glassShared.uTime.value = t;

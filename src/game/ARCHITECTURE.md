@@ -153,7 +153,7 @@ painted only. HIGH: half-float MSAA target with a depth texture -> depth of fiel
 circle of confusion from each pixel's depth around the docked screen's plane; pixels with alpha 0,
 the screen holes, are never blurred or sampled and every pixel keeps its own alpha, so the DOM screen
 and its edge stay sharp) -> bloom (restrained) -> output -> finish (scene alpha back, vignette on the
-world only). Show glass (the reservoir vessel, the chandelier's globes, the hanging lamps) uses
+world only). Show glass (only the reservoir vessel and the chandelier's globes) uses
 transmission on HIGH, which costs three's extra scene pass; keep such meshes few.
 
 Rules: wall dressing stays under about 1.1 m (wainscot) or above 5.7 m (cornice) and shallower than

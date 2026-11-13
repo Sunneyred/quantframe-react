@@ -342,7 +342,7 @@ export function buildObservatoryShell(p: Palette, quality: () => boolean): Obser
     ["rose", 2.1, 0.5, 4.2],
   ];
   for (const [glass, len, size, a] of lantern) {
-    const lamp = hangingLamp(p, glass, len, size, true);
+    const lamp = hangingLamp(p, glass, len, size);
     lamp.group.position.set(Math.cos(a) * 0.9, crownY - 0.1, Math.sin(a) * 0.9);
     group.add(lamp.group);
     updates.push((_dt, t) => lamp.update(t * 0.8));

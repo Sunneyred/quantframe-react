@@ -174,14 +174,15 @@ export function buildShell(p: Palette, scene: THREE.Scene): Shell {
       seg.put(hub, p.brass, [0, WINDOW.spring, -0.35]);
       seg.put(new THREE.BoxGeometry(0.05, WINDOW.spring - WINDOW.sill, 0.05), p.brass, [0, (WINDOW.spring + WINDOW.sill) / 2, -0.38]);
       seg.put(boxM(WINDOW.half * 2 + 0.5, 0.08, 0.86), p.wood, [0, WINDOW.sill - 0.04, -0.2]);
-      // a banquette under the window, and an instrument on the pier beside it
-      banquette(seg.frame(new THREE.Matrix4().makeTranslation(0, 0, 0.06)), p, WINDOW.half * 2 - 0.2);
+      // a banquette under the north windows, and an instrument on the pier beside each
+      // (the south windows stay clear: a bank of terminals stands in front of them)
+      if (deg === 30 || deg === 330) banquette(seg.frame(new THREE.Matrix4().makeTranslation(0, 0, 0.06)), p, WINDOW.half * 2 - 0.2);
       const pier = (SEG_W / 2 + WINDOW.half + 0.3) / 2 - 0.12;
       const here = new THREE.Matrix4().makeRotationY(faceCentre(deg)).setPosition(polar(deg, APOTHEM));
-      if (deg === 30 || deg === 210) instrumentCluster(b, idlers, p, here.clone().multiply(new THREE.Matrix4().makeTranslation(-pier, 1.75, 0.012)), 0.62);
-      if (deg === 330 || deg === 150) reelUnit(b, idlers, p, here.clone().multiply(new THREE.Matrix4().makeTranslation(pier, 1.75, 0.012)), 0.56, deg === 330 ? "teal" : "tangerine");
+      if (deg === 30) instrumentCluster(b, idlers, p, here.clone().multiply(new THREE.Matrix4().makeTranslation(-pier, 1.75, 0.012)), 0.62);
+      if (deg === 330) reelUnit(b, idlers, p, here.clone().multiply(new THREE.Matrix4().makeTranslation(pier, 1.75, 0.012)), 0.56, deg === 330 ? "teal" : "tangerine");
       // the light it throws
-      patches.push({ from: polar(deg, APOTHEM - 1.0), to: polar(deg, 5.0), width: 2.5, color: LIGHT[glassKind], strength: 0.24 });
+      patches.push({ from: polar(deg, APOTHEM - 1.0), to: polar(deg, 5.0), width: 2.5, color: LIGHT[glassKind], strength: 0.16 });
     }
     if (kind === "door-open") corridor(p, seg, group, deg);
     if (door) {
@@ -273,7 +274,7 @@ export function buildShell(p: Palette, scene: THREE.Scene): Shell {
         fragmentShader: /* glsl */ `
           varying vec2 vUv;
           void main() {
-            float a = pow(1.0 - vUv.y, 2.6) * 0.22;
+            float a = pow(1.0 - vUv.y, 2.2) * 0.12;
             gl_FragColor = vec4(vec3(1.0, 0.62, 0.34) * a, a);
             ${OUTPUT_CHUNKS}
           }`,
@@ -309,7 +310,7 @@ export function buildShell(p: Palette, scene: THREE.Scene): Shell {
   const lampGlass: GlassName[] = ["cobalt", "rose", "teal", "amber"];
   [45, 135, 225, 315].forEach((deg, i) => {
     const top = domeAt(deg, Math.asin(6.9 / R), 0.97);
-    const lamp = hangingLamp(p, lampGlass[i], top.y - 8.0, 0.95, true);
+    const lamp = hangingLamp(p, lampGlass[i], top.y - 8.0, 0.95);
     lamp.group.position.copy(top);
     group.add(lamp.group);
     updates.push((_dt, t) => lamp.update(t));

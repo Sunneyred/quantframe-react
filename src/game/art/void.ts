@@ -273,8 +273,8 @@ export function makePlanets(): { group: THREE.Group; update(dt: number): void } 
       void main() {
         float r = (length(vP) - 92.0) / 48.0;
         float bands = 0.55 + 0.45 * sin(r * 40.0) * sin(r * 13.0 + 1.0);
-        float a = smoothstep(0.0, 0.08, r) * smoothstep(1.0, 0.9, r) * bands * 0.26;
-        gl_FragColor = vec4(vec3(0.95, 0.78, 0.5) * a, a);
+        float a = smoothstep(0.0, 0.08, r) * smoothstep(1.0, 0.9, r) * bands * 0.13;
+        gl_FragColor = vec4(vec3(0.9, 0.7, 0.42) * a, a);
         ${OUTPUT_CHUNKS}
       }`,
     side: THREE.DoubleSide,
