@@ -13,7 +13,7 @@ import { open } from "@tauri-apps/plugin-shell";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { prefetchRoute } from "../routeLoaders";
-import { classicReason, setClassic, useClassicMode } from "../../../game/shellMode";
+import { classicReason, isClassic, setClassic, useClassicMode } from "../../../game/shellMode";
 import classes from "./LogInLayout.module.css";
 
 export function LogInLayout() {
@@ -182,7 +182,7 @@ export function LogInLayout() {
   // Toggle dev mode when Shift is pressed.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Shift" && !e.repeat) setDevMode((prev) => !prev);
+      if (e.key === "Shift" && !e.repeat && isClassic() && !e.ctrlKey) setDevMode((prev) => !prev);
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => {

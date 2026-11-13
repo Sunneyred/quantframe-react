@@ -24,7 +24,7 @@
   },
   "productName": "Void Trader",
   "mainBinaryName": "VoidTrader",
-  "version": "1.14.1",
+  "version": "1.15.0",
   "identifier": "dev.kenya.quantframe",
   "plugins": {
     "updater": {
