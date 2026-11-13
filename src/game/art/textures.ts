@@ -1,8 +1,9 @@
 import * as THREE from "three";
 
 /**
- * Every texture in the game is drawn here, in code, on canvases: no image files.
- * Material maps come in pairs: a colour map and a "metal/rough" map (G = roughness, B = metalness),
+ * Every texture in the game is drawn in code, on canvases: no image files. This file holds the
+ * shared plumbing (noise, canvases, glyphs, labels); the material surfaces are in surfaces.ts and
+ * the art-glass patterns in glass.ts. Material maps come in pairs: a colour map and a "metal/rough" map (G = roughness, B = metalness),
  * the channel layout three.js reads for roughnessMap and metalnessMap.
  */
 
@@ -28,7 +29,7 @@ export function canvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderin
   return [c, ctx];
 }
 
-function tex(c: HTMLCanvasElement, color: boolean, repeat = true): THREE.CanvasTexture {
+export function tex(c: HTMLCanvasElement, color: boolean, repeat = true): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(c);
   if (color) t.colorSpace = THREE.SRGBColorSpace;
   if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -38,30 +39,31 @@ function tex(c: HTMLCanvasElement, color: boolean, repeat = true): THREE.CanvasT
 }
 
 /** Tileable value noise on a grid, smoothed. */
-function noiseField(w: number, h: number, cells: number, seed: number): Float32Array {
+export function noiseField(w: number, h: number, cells: number, seed: number, cellsY = cells): Float32Array {
   const r = rng(seed);
-  const g = new Float32Array(cells * cells).map(() => r());
+  const cx = cells;
+  const g = new Float32Array(cx * cellsY).map(() => r());
   const out = new Float32Array(w * h);
   const sm = (t: number) => t * t * (3 - 2 * t);
   for (let y = 0; y < h; y++) {
-    const fy = (y / h) * cells;
+    const fy = (y / h) * cellsY;
     const y0 = Math.floor(fy);
     const ty = sm(fy - y0);
     for (let x = 0; x < w; x++) {
       const fx = (x / w) * cells;
       const x0 = Math.floor(fx);
       const tx = sm(fx - x0);
-      const a = g[(y0 % cells) * cells + (x0 % cells)];
-      const b = g[(y0 % cells) * cells + ((x0 + 1) % cells)];
-      const c = g[((y0 + 1) % cells) * cells + (x0 % cells)];
-      const d = g[((y0 + 1) % cells) * cells + ((x0 + 1) % cells)];
+      const a = g[(y0 % cellsY) * cx + (x0 % cx)];
+      const b = g[(y0 % cellsY) * cx + ((x0 + 1) % cx)];
+      const c = g[((y0 + 1) % cellsY) * cx + (x0 % cx)];
+      const d = g[((y0 + 1) % cellsY) * cx + ((x0 + 1) % cx)];
       out[y * w + x] = a + (b - a) * tx + (c - a) * ty + (a - b - c + d) * tx * ty;
     }
   }
   return out;
 }
 
-function fbm(w: number, h: number, seed: number): Float32Array {
+export function fbm(w: number, h: number, seed: number): Float32Array {
   const out = new Float32Array(w * h);
   let amp = 0.5;
   for (const [cells, k] of [
@@ -77,204 +79,9 @@ function fbm(w: number, h: number, seed: number): Float32Array {
   return out;
 }
 
-/** Paint the noise into a canvas as a soft pearl base colour. */
-function pearlBase(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number, base: [number, number, number], spread = 14) {
-  const img = ctx.createImageData(w, h);
-  const n = fbm(w, h, seed);
-  const n2 = noiseField(w, h, 6, seed + 11);
-  for (let i = 0; i < w * h; i++) {
-    const v = (n[i] - 0.47) * spread;
-    const tint = (n2[i] - 0.5) * 10; // pearl: cool and warm drifts
-    img.data[i * 4] = base[0] + v + tint;
-    img.data[i * 4 + 1] = base[1] + v;
-    img.data[i * 4 + 2] = base[2] + v - tint;
-    img.data[i * 4 + 3] = 255;
-  }
-  ctx.putImageData(img, 0, 0);
-}
-
-function metalRoughBase(ctx: CanvasRenderingContext2D, w: number, h: number, rough: number) {
-  ctx.fillStyle = `rgb(0, ${Math.round(rough * 255)}, 0)`;
-  ctx.fillRect(0, 0, w, h);
-}
-
-/** Draws on both the colour and the metal/rough canvas at once. */
-type Pen = (ctx: CanvasRenderingContext2D, kind: "color" | "mr") => void;
-function both(cc: CanvasRenderingContext2D, mc: CanvasRenderingContext2D, pen: Pen) {
-  cc.save();
-  pen(cc, "color");
-  cc.restore();
-  mc.save();
-  pen(mc, "mr");
-  mc.restore();
-}
-const goldInk = (kind: "color" | "mr") => (kind === "color" ? GOLD : "rgb(0, 70, 255)");
-const seamInk = (kind: "color" | "mr", a = 0.35) => (kind === "color" ? `rgba(120, 104, 84, ${a})` : "rgb(0, 200, 0)");
-
-/** A filigree scroll: a spiral with leaves, the motif used on every gold trim. */
-function scroll(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, flip: number) {
-  ctx.beginPath();
-  for (let i = 0; i <= 40; i++) {
-    const t = i / 40;
-    const a = flip * (t * Math.PI * 2.6);
-    const r = s * (1 - t * 0.82);
-    const px = x + Math.cos(a) * r;
-    const py = y + Math.sin(a) * r;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.stroke();
-}
-
 export interface MapPair {
   map: THREE.CanvasTexture;
   mr: THREE.CanvasTexture;
-}
-
-/** A 2 m x 2 m pearl wall tile: soft panels, recessed seams, one thin gold inlay line. */
-export function pearlPanel(seed = 7): MapPair {
-  const S = 512;
-  const [c, cc] = canvas(S, S);
-  const [m, mc] = canvas(S, S);
-  pearlBase(cc, S, S, seed, [214, 207, 192]);
-  metalRoughBase(mc, S, S, 0.38);
-  both(cc, mc, (ctx, kind) => {
-    ctx.strokeStyle = seamInk(kind, 0.55);
-    ctx.lineWidth = 3;
-    ctx.strokeRect(1.5, 1.5, S - 3, S - 3);
-    ctx.strokeStyle = seamInk(kind, 0.28);
-    ctx.lineWidth = 2;
-    const r = 26;
-    const i0 = 40;
-    ctx.beginPath();
-    ctx.roundRect(i0, i0, S - i0 * 2, S - i0 * 2, r);
-    ctx.stroke();
-    ctx.strokeStyle = goldInk(kind);
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.roundRect(i0 + 12, i0 + 12, S - i0 * 2 - 24, S - i0 * 2 - 24, r - 8);
-    ctx.stroke();
-    // corner scrolls
-    ctx.lineWidth = 2;
-    for (const [x, y, f] of [
-      [i0 + 46, i0 + 46, 1],
-      [S - i0 - 46, i0 + 46, -1],
-      [i0 + 46, S - i0 - 46, -1],
-      [S - i0 - 46, S - i0 - 46, 1],
-    ])
-      scroll(ctx, x, y, 22, f);
-  });
-  return { map: tex(c, true), mr: tex(m, false) };
-}
-
-/** Repeating gold filigree band (1 tile = 2 m long, 0.25 m tall) on a pale ivory ground. */
-export function filigreeBand(seed = 3): MapPair {
-  const W = 1024;
-  const H = 128;
-  const [c, cc] = canvas(W, H);
-  const [m, mc] = canvas(W, H);
-  pearlBase(cc, W, H, seed, [214, 204, 184], 10);
-  metalRoughBase(mc, W, H, 0.45);
-  both(cc, mc, (ctx, kind) => {
-    ctx.strokeStyle = goldInk(kind);
-    ctx.fillStyle = goldInk(kind);
-    ctx.fillRect(0, 0, W, 10);
-    ctx.fillRect(0, H - 10, W, 10);
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    for (let x = 0; x <= W; x += 4) {
-      const y = H / 2 + Math.sin((x / W) * Math.PI * 8) * 26;
-      if (x === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-    for (let k = 0; k < 8; k++) {
-      const x = (k + 0.5) * (W / 8);
-      const up = k % 2 === 0;
-      scroll(ctx, x, H / 2 + (up ? -18 : 18), 20, up ? 1 : -1);
-      ctx.beginPath();
-      ctx.arc(x + W / 16, H / 2, 5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  });
-  const pair = { map: tex(c, true), mr: tex(m, false) };
-  pair.map.wrapT = pair.mr.wrapT = THREE.ClampToEdgeWrapping;
-  return pair;
-}
-
-/** The whole vault floor, drawn once (not tiled): rings, radial spokes, a medallion, gold inlay. */
-export function vaultFloor(radius: number): MapPair {
-  const S = 2048;
-  const [c, cc] = canvas(S, S);
-  const [m, mc] = canvas(S, S);
-  pearlBase(cc, S, S, 41, [104, 94, 90], 18);
-  metalRoughBase(mc, S, S, 0.22);
-  const px = S / 2 / radius; // pixels per metre
-  const ctr = S / 2;
-  both(cc, mc, (ctx, kind) => {
-    // darker outer walkway ring
-    if (kind === "color") {
-      const g = ctx.createRadialGradient(ctr, ctr, px * 3, ctr, ctr, px * radius);
-      g.addColorStop(0, "rgba(255,250,240,0.10)");
-      g.addColorStop(0.55, "rgba(0,0,0,0)");
-      g.addColorStop(1, "rgba(40,30,30,0.35)");
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, S, S);
-    }
-    // stone joints: rings and spokes
-    ctx.strokeStyle = seamInk(kind, 0.5);
-    ctx.lineWidth = 3;
-    for (const r of [2.6, 4.4, 6.6, 9, 11.2]) {
-      ctx.beginPath();
-      ctx.arc(ctr, ctr, r * px, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    for (let k = 0; k < 24; k++) {
-      const a = (k / 24) * Math.PI * 2;
-      const r0 = (k % 2 ? 6.6 : 4.4) * px;
-      ctx.beginPath();
-      ctx.moveTo(ctr + Math.cos(a) * r0, ctr + Math.sin(a) * r0);
-      ctx.lineTo(ctr + Math.cos(a) * radius * px, ctr + Math.sin(a) * radius * px);
-      ctx.stroke();
-    }
-    // gold inlay rings around the reservoir and on the walkway
-    ctx.strokeStyle = goldInk(kind);
-    for (const [r, w] of [
-      [2.35, 7],
-      [2.5, 2.5],
-      [4.25, 3],
-      [8.8, 4],
-      [9.05, 2],
-    ]) {
-      ctx.lineWidth = w;
-      ctx.beginPath();
-      ctx.arc(ctr, ctr, r * px, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    // the medallion: a twelve-point star of arcs between 2.5 m and 4.25 m
-    ctx.lineWidth = 3;
-    for (let k = 0; k < 12; k++) {
-      const a = (k / 12) * Math.PI * 2;
-      const b = a + Math.PI / 12;
-      ctx.beginPath();
-      ctx.moveTo(ctr + Math.cos(a) * 2.5 * px, ctr + Math.sin(a) * 2.5 * px);
-      ctx.quadraticCurveTo(ctr + Math.cos(b) * 3.0 * px, ctr + Math.sin(b) * 3.0 * px, ctr + Math.cos(b) * 4.25 * px, ctr + Math.sin(b) * 4.25 * px);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(ctr + Math.cos(a + Math.PI / 6) * 2.5 * px, ctr + Math.sin(a + Math.PI / 6) * 2.5 * px);
-      ctx.quadraticCurveTo(ctr + Math.cos(b) * 3.0 * px, ctr + Math.sin(b) * 3.0 * px, ctr + Math.cos(b) * 4.25 * px, ctr + Math.sin(b) * 4.25 * px);
-      ctx.stroke();
-    }
-    // scrolls between the walkway rings
-    ctx.lineWidth = 2.5;
-    for (let k = 0; k < 24; k++) {
-      const a = ((k + 0.5) / 24) * Math.PI * 2;
-      const r = 9.9 * px;
-      scroll(ctx, ctr + Math.cos(a) * r, ctr + Math.sin(a) * r, 0.32 * px, k % 2 ? 1 : -1);
-    }
-  });
-  const pair = { map: tex(c, true, false), mr: tex(m, false, false) };
-  return pair;
 }
 
 /** Radial soft shadow, used as a cheap contact shadow under props and figures. */

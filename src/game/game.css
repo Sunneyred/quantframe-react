@@ -93,10 +93,16 @@
   inset: 0;
   display: flex;
   flex-direction: column;
+  /* a warm glass tube: teal phosphor glow at the top, a deep plum-black body, a brass hairline */
   background:
-    radial-gradient(120% 90% at 50% 0%, rgba(42, 212, 230, 0.13), transparent 60%),
-    linear-gradient(180deg, #0a1428 0%, #070b1c 55%, #060818 100%);
-  border: 1px solid rgba(42, 212, 230, 0.35);
+    radial-gradient(120% 90% at 50% 0%, rgba(53, 214, 200, 0.12), transparent 60%),
+    radial-gradient(90% 70% at 50% 110%, rgba(255, 170, 90, 0.07), transparent 70%),
+    linear-gradient(180deg, #10142a 0%, #0c0d20 55%, #0b0a1a 100%);
+  /* no radius, shadow or blur here: every screen is a 3D-transformed layer, composited in software
+     on weak machines, and masks or blurred shadows on such layers are very expensive */
+  border: 2px solid rgba(226, 178, 96, 0.6);
+  outline: 3px solid rgba(12, 8, 6, 0.9);
+  outline-offset: -6px;
 }
 .vtg-frame::after {
   /* scanlines and a slow sweep */

@@ -1,5 +1,8 @@
 import * as THREE from "three";
 import type { MarketStar, OrderBook, PriceHistory } from "@api/market";
+import { blown, FORMS } from "../../art/glass";
+import { Batch } from "../../art/kit";
+import { consoleBody, Idlers } from "../../art/props";
 import { CanvasLabel, CYAN, FONT_DISPLAY, GOLD } from "../../art/textures";
 import type { Engine } from "../../core/Engine";
 import type { Screen } from "../../core/screens";
@@ -43,12 +46,14 @@ export class ObservatoryRoom {
   /** Sound: where the spire stands (world), and whether the current undercut was already announced. */
   private spireWorld = new THREE.Vector3();
   private cutHeard = false;
+  private idlers!: Idlers;
 
   constructor(
     private engine: Engine,
     hooks: ObservatoryHooks,
   ) {
     const { scene, palette: p, world, screens, interact } = engine;
+    this.idlers = new Idlers(p);
     this.root.name = "observatory";
     this.root.position.set(0, 0, OBS_Z);
     scene.add(this.root);
@@ -100,24 +105,17 @@ export class ObservatoryRoom {
     lectern.position.copy(lpolar(CONSOLE_DEG, CONSOLE_R + 0.35));
     lectern.rotation.y = lface(CONSOLE_DEG);
     this.root.add(lectern);
-    const body = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.8, 0.5), p.pearlPlain);
-    body.position.y = 0.4;
-    lectern.add(body);
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.05, 0.6), p.gold);
-    cap.position.y = 0.82;
-    lectern.add(cap);
-    const band = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 0.2), p.filigree);
-    band.position.set(0, 0.55, 0.252);
-    lectern.add(band);
+    lectern.updateMatrix();
+    const lb = new Batch();
+    consoleBody(lb, this.idlers, p, 2.3, 0.84, 0.5, { frame: lectern.matrix.clone(), colour: "navy" });
     for (const x of [-1.15, 1.15]) {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.6, 10), p.gold);
-      post.position.set(x, 1.3, -0.05);
-      lectern.add(post);
-      const tip = new THREE.Mesh(new THREE.OctahedronGeometry(0.1, 0), p.cyanGlow);
-      tip.position.set(x, 2.7, -0.05);
-      tip.scale.y = 1.6;
-      lectern.add(tip);
+      lb.put(new THREE.CylinderGeometry(0.045, 0.06, 2.6, 12), p.gold, [x, 1.3, -0.05]);
+      lb.put(new THREE.SphereGeometry(0.07, 10, 8), p.cyanGlow, [x, 2.78, -0.05]);
+      lb.put(blown(FORMS.globe, { ribs: 10, ribDepth: 0.05, twist: 0.4, segments: 20, rings: 16 }), p.glass.teal, [x, 2.62, -0.05], [0, 0, 0], 0.3);
     }
+    lb.build(lectern);
+    this.idlers.build();
+    this.root.add(this.idlers.group);
     lectern.add(p.shadowDecal(3, 1.2));
     const lw = this.root.localToWorld(lectern.position.clone());
     world.box(lw.x, lw.z, 1.3, 0.4, lectern.rotation.y);
@@ -330,6 +328,7 @@ export class ObservatoryRoom {
     this.orrery.update(dt, t, this.engine.camera, !this.engine.screens.busy);
     this.spire.update(dt, t);
     this.ribbon.update(dt);
+    this.idlers.update(t);
   }
 
   dispose() {

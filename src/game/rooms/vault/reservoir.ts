@@ -1,11 +1,16 @@
 import * as THREE from "three";
+import { blown, FORMS, tiered } from "../../art/glass";
 import type { Palette } from "../../art/materials";
-import { additive, OUTPUT_CHUNKS } from "../../art/kit";
+import { additive, Batch, OUTPUT_CHUNKS } from "../../art/kit";
+import { Idlers, instrumentCluster, scaleUV } from "../../art/props";
 import { CanvasLabel, FONT_DISPLAY, GOLD } from "../../art/textures";
 import { clamp, easeLevel, planSurge, progressToFill, type GoalSnapshot } from "../../../station/engine/logic";
 
 /**
- * The Plat Reservoir: a glass column of glowing gold liquid. Fill level follows plat goal progress
+ * The Plat Reservoir: a great blown-glass vessel of glowing gold liquid, swelling to a belly and
+ * drawn in to a neck, held in a brass armature on a walnut and leather plinth. The glass is
+ * latticino (white canes and gold threads): a show piece with real refraction on HIGH, the cheap
+ * glass shader on LOW. The liquid follows the vessel's profile (`vesselR`, mirrored in GLSL). Fill level follows plat goal progress
  * (the station's own mapping, `progressToFill`), the goal ring marks a full goal, and a sale pours
  * liquid in from the crown (sized with the station's `planSurge`), sloshes the surface and floats "+Np".
  */
@@ -17,6 +22,22 @@ const FILL_MIN = 0.05;
 const FILL_GOAL = 0.86;
 const SPAN = TOP_Y - BASE_Y;
 export const GOAL_Y = BASE_Y + FILL_GOAL * SPAN;
+
+/** Outer radius of the glass at height y: a belly low down, a neck at the goal line, a flared lip. */
+export function vesselR(y: number): number {
+  const t = (y - BASE_Y) / SPAN;
+  const lip = Math.min(1, Math.max(0, (t - 0.93) / 0.07));
+  return RADIUS * (1 + 0.3 * Math.exp(-(((t - 0.3) / 0.26) ** 2)) - 0.16 * Math.exp(-(((t - 0.86) / 0.12) ** 2)) + 0.1 * lip * lip * (3 - 2 * lip));
+}
+const WALL = 0.06; // glass thickness: the liquid stays this far inside
+const VESSEL_GLSL = /* glsl */ `
+float vesselR(float y) {
+  float t = (y - ${BASE_Y.toFixed(3)}) / ${SPAN.toFixed(3)};
+  float a = (t - 0.3) / 0.26;
+  float b = (t - 0.86) / 0.12;
+  return ${RADIUS.toFixed(3)} * (1.0 + 0.3 * exp(-a * a) - 0.16 * exp(-b * b) + 0.1 * smoothstep(0.93, 1.0, t));
+}
+float liquidR(float y) { return vesselR(y) - ${WALL.toFixed(3)}; }`;
 
 // The surface shape, shared by the side wall's top edge and the surface disc.
 const SURFACE_GLSL = /* glsl */ `
@@ -43,16 +64,21 @@ float caustic(vec2 p, float t) {
 
 const SIDE_VERT = /* glsl */ `
 ${SURFACE_GLSL}
+${VESSEL_GLSL}
 varying vec3 vPos;
 varying vec3 vNormalV;
 varying vec3 vViewDir;
 void main() {
-  vec3 p = position;
-  float top = surfaceAt(p.xz);
-  p.y = mix(${BASE_Y.toFixed(3)}, top, position.y);
+  // a unit cylinder: xz is the direction, y the fraction of the fill height
+  vec2 dir = normalize(position.xz);
+  float top = surfaceAt(dir * liquidR(uLevel));
+  float y = mix(${BASE_Y.toFixed(3)}, top, position.y);
+  float r = liquidR(y);
+  vec3 p = vec3(dir.x * r, y, dir.y * r);
   vPos = p;
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
-  vNormalV = normalize(normalMatrix * normal);
+  float slope = (liquidR(y + 0.05) - liquidR(y - 0.05)) / 0.1;
+  vNormalV = normalize(normalMatrix * normalize(vec3(dir.x, -slope, dir.y)));
   vViewDir = normalize(-mv.xyz);
   gl_Position = projectionMatrix * mv;
 }`;
@@ -84,6 +110,8 @@ void main() {
 
 const SURF_VERT = /* glsl */ `
 ${SURFACE_GLSL}
+${VESSEL_GLSL}
+varying float vEdge;
 varying vec2 vXZ;
 varying vec3 vViewDir;
 varying vec3 vN;
@@ -91,6 +119,7 @@ void main() {
   vec3 p = position;
   vXZ = p.xz;
   p.y = surfaceAt(p.xz);
+  vEdge = liquidR(uLevel);
   float e = 0.04;
   vec3 n = normalize(vec3(surfaceAt(p.xz - vec2(e, 0.0)) - surfaceAt(p.xz + vec2(e, 0.0)), 2.0 * e, surfaceAt(p.xz - vec2(0.0, e)) - surfaceAt(p.xz + vec2(0.0, e))));
   vN = n;
@@ -105,41 +134,17 @@ uniform float uGlow;
 varying vec2 vXZ;
 varying vec3 vViewDir;
 varying vec3 vN;
+varying float vEdge;
 ${NOISE_GLSL}
 void main() {
   float r = length(vXZ);
-  if (r > ${RADIUS.toFixed(3)}) discard;
+  if (r > vEdge) discard;
   float c = caustic(vXZ * 3.0, uTime * 1.2);
   vec3 col = mix(vec3(0.85, 0.42, 0.05), vec3(1.0, 0.74, 0.3), c);
   float spec = pow(max(0.0, dot(reflect(-vViewDir, vN), normalize(vec3(0.2, 1.0, 0.1)))), 30.0);
   col += vec3(1.0, 0.95, 0.8) * spec * 1.5;
-  col *= 1.0 + smoothstep(${(RADIUS - 0.12).toFixed(3)}, ${RADIUS.toFixed(3)}, r) * 0.6;
+  col *= 1.0 + smoothstep(vEdge - 0.12, vEdge, r) * 0.6;
   gl_FragColor = vec4(col * uGlow * 1.05, 1.0);
-  ${OUTPUT_CHUNKS}
-}`;
-
-const GLASS_VERT = /* glsl */ `
-varying vec3 vN;
-varying vec3 vV;
-varying vec3 vP;
-void main() {
-  vec4 w = modelMatrix * vec4(position, 1.0);
-  vP = w.xyz;
-  vN = normalize(mat3(modelMatrix) * normal);
-  vV = normalize(cameraPosition - w.xyz);
-  gl_Position = projectionMatrix * viewMatrix * w;
-}`;
-const GLASS_FRAG = /* glsl */ `
-uniform float uTime;
-varying vec3 vN;
-varying vec3 vV;
-varying vec3 vP;
-void main() {
-  float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 3.0);
-  float streak = smoothstep(0.92, 1.0, sin(atan(vP.z, vP.x) * 9.0 + 0.4)) * 0.25;
-  float a = clamp(0.02 + f * 0.3 + streak * 0.12, 0.0, 0.45);
-  vec3 col = mix(vec3(0.6, 0.85, 1.0), vec3(1.0, 0.9, 0.7), f) * 0.7;
-  gl_FragColor = vec4(col * a, a);
   ${OUTPUT_CHUNKS}
 }`;
 
@@ -160,6 +165,7 @@ void main() {
 }`;
 
 const MOTE_VERT = /* glsl */ `
+${VESSEL_GLSL}
 uniform float uTime;
 uniform float uLevel;
 attribute vec3 seed;
@@ -168,7 +174,7 @@ void main() {
   float span = max(0.1, uLevel - ${BASE_Y.toFixed(3)});
   float y = ${BASE_Y.toFixed(3)} + mod(seed.x * span + uTime * (0.12 + seed.y * 0.25), span);
   float a = seed.z * 6.2831 + uTime * 0.2 * (seed.y - 0.5);
-  float r = sqrt(seed.y) * ${(RADIUS - 0.08).toFixed(3)};
+  float r = sqrt(seed.y) * (liquidR(y) - 0.06);
   vec3 p = vec3(cos(a) * r, y, sin(a) * r);
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   gl_Position = projectionMatrix * mv;
@@ -214,8 +220,8 @@ export class Reservoir {
   private goalLabel = new CanvasLabel(512, 128);
   private light: THREE.PointLight;
   private ripples: Array<{ m: THREE.Mesh; age: number }> = [];
-  private glassMat: THREE.ShaderMaterial;
   private motesMat: THREE.ShaderMaterial;
+  private idlers: Idlers;
 
   constructor(
     p: Palette,
@@ -224,98 +230,99 @@ export class Reservoir {
     const g = this.group;
     g.name = "reservoir";
 
-    // pedestal
-    const ped = new THREE.Mesh(
-      new THREE.LatheGeometry(
-        [
-          [0, 0],
-          [2.15, 0],
-          [2.15, 0.12],
-          [1.95, 0.22],
-          [1.9, 0.42],
-          [1.72, 0.52],
-          [1.66, 0.82],
-          [1.45, 0.92],
-          [1.4, 1.02],
-          [0, 1.02],
-        ].map(([x, y]) => new THREE.Vector2(x, y)),
-        64,
-      ),
-      p.pearlPlain,
-    );
-    g.add(ped);
-    for (const [r, y, w] of [
-      [2.16, 0.12, 0.04],
-      [1.91, 0.42, 0.035],
-      [1.67, 0.82, 0.03],
-      [1.41, 1.02, 0.05],
-    ]) g.add(ring(r, y, w, p.gold));
+    const b = new Batch();
+    this.idlers = new Idlers(p);
 
-    // glass and frame
-    this.glassMat = additive(new THREE.ShaderMaterial({ vertexShader: GLASS_VERT, fragmentShader: GLASS_FRAG, uniforms: { uTime: this.uniforms.uTime } }));
-    const glass = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 6.62, 64, 1, true), this.glassMat);
-    glass.position.y = 1.02 + 3.31;
-    glass.renderOrder = 4;
-    g.add(glass);
-    for (let k = 0; k < 6; k++) {
-      const a = (k / 6) * Math.PI * 2;
-      const rib = new THREE.Mesh(new THREE.BoxGeometry(0.05, 6.62, 0.07), p.goldDark);
-      rib.position.set(Math.cos(a) * 1.25, 1.02 + 3.31, Math.sin(a) * 1.25);
-      rib.rotation.y = -a;
-      g.add(rib);
+    // --- plinth: brass foot, walnut step, a tufted leather drum with instruments, a brass cradle
+    const lathe = (pts: number[][], segs = 64) => new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), segs);
+    b.put(lathe([[0, 0], [2.15, 0], [2.15, 0.1], [2.02, 0.14]]), p.brassDark);
+    b.put(scaleUV(lathe([[2.02, 0.14], [1.98, 0.36], [1.9, 0.42], [1.74, 0.44]]), 12, 1), p.wood);
+    b.put(scaleUV(lathe([[1.72, 0.44], [1.72, 0.84]]), 27, 1), p.leather);
+    b.put(lathe([[1.76, 0.82], [1.76, 0.88], [1.5, 0.96], [1.44, 1.02], [vesselR(BASE_Y) + 0.1, 1.02], [vesselR(BASE_Y + 0.3) + 0.06, BASE_Y + 0.3], [vesselR(BASE_Y + 0.3) + 0.02, BASE_Y + 0.3]]), p.brass);
+    for (const [r, y, w] of [
+      [2.03, 0.14, 0.03],
+      [1.75, 0.44, 0.028],
+    ]) b.put(ringGeo(r, w), p.brass, [0, y, 0]);
+    // instruments let into the leather, to the sides and behind (the lectern stands in front)
+    for (const deg of [70, 180, 290]) {
+      const a = THREE.MathUtils.degToRad(deg);
+      const frame = new THREE.Matrix4().makeRotationY(a).multiply(new THREE.Matrix4().makeTranslation(0, 0.64, 1.72));
+      instrumentCluster(b, this.idlers, p, frame, 0.6);
     }
-    // tick marks every tenth of the way to the goal, on the front rib pair
+
+    // --- the brass armature: six staves following the glass, a collar at the neck, a cap on the lip
+    const staveR = 0.022;
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2 + Math.PI / 6;
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i <= 26; i++) {
+        const y = BASE_Y + 0.28 + (i / 26) * (TOP_Y + 0.12 - BASE_Y - 0.28);
+        const r = vesselR(y) + 0.035;
+        pts.push(new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r));
+      }
+      b.put(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, staveR, 6, false), p.brass);
+    }
+    // the gauge: ticks every tenth of the way to the goal, on a brass rule standing in front
     for (let i = 1; i <= 10; i++) {
       const y = BASE_Y + (FILL_MIN + (FILL_GOAL - FILL_MIN) * (i / 10)) * SPAN;
-      const tick = new THREE.Mesh(new THREE.BoxGeometry(i % 5 === 0 ? 0.16 : 0.08, 0.014, 0.014), p.gold);
-      tick.position.set(0, y, 1.27);
-      g.add(tick);
+      b.put(new THREE.BoxGeometry(i % 5 === 0 ? 0.2 : 0.1, 0.016, 0.016), p.brass, [0, y, vesselR(y) + 0.05]);
     }
-    g.add(ring(1.27, 7.64, 0.09, p.gold));
-    g.add(ring(1.24, 1.05, 0.06, p.gold));
-
-    // goal ring and its label
-    const goalRing = ring(1.34, GOAL_Y, 0.03, p.goldGlow);
-    g.add(goalRing);
-    const goalRing2 = ring(1.42, GOAL_Y, 0.012, p.cyanGlow);
-    g.add(goalRing2);
-    const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.goalLabel.texture, transparent: true, depthWrite: false, toneMapped: false }));
-    gl.scale.set(1.3, 0.325, 1);
-    gl.position.set(0, GOAL_Y + 0.28, 1.42);
-    g.add(gl);
-
-    // crown and spout
-    const crown = new THREE.Mesh(
-      new THREE.LatheGeometry(
-        [
-          [0.12, 7.4],
-          [0.2, 7.55],
-          [1.36, 7.68],
-          [1.3, 7.9],
-          [0.9, 8.15],
-          [0.5, 8.5],
-          [0.24, 8.85],
-          [0, 9.05],
-        ].map(([x, y]) => new THREE.Vector2(x, y)),
-        48,
-      ),
-      p.pearlPlain,
-    );
-    g.add(crown);
-    g.add(ring(1.32, 7.78, 0.05, p.gold));
-    g.add(ring(0.62, 8.42, 0.04, p.gold));
-    const finial = new THREE.Mesh(new THREE.OctahedronGeometry(0.2, 0), p.goldGlow);
-    finial.position.y = 9.2;
-    finial.scale.y = 1.8;
+    b.put(ringGeo(vesselR(GOAL_Y) + 0.05, 0.045), p.brass, [0, GOAL_Y - 0.08, 0]);
+    b.put(ringGeo(vesselR(4.2) + 0.045, 0.03), p.brass, [0, 4.2, 0]);
+    b.put(ringGeo(vesselR(2.2) + 0.045, 0.03), p.brass, [0, 2.2, 0]);
+    const lipR = vesselR(TOP_Y);
+    b.put(lathe([[lipR + 0.06, TOP_Y - 0.02], [lipR + 0.1, TOP_Y + 0.12], [lipR - 0.05, TOP_Y + 0.34], [0.72, TOP_Y + 0.62], [0.36, TOP_Y + 0.98], [0.2, TOP_Y + 1.3], [0.16, TOP_Y + 1.42], [0.26, TOP_Y + 1.46]], 48), p.brass);
+    b.put(lathe([[0.1, TOP_Y - 0.1], [0.2, TOP_Y + 0.02], [lipR + 0.06, TOP_Y - 0.02]], 32), p.brassDark);
+    b.put(ringGeo(0.74, 0.035), p.brass, [0, TOP_Y + 0.6, 0]);
+    b.put(new THREE.SphereGeometry(0.1, 12, 10), p.warmGlow, [0, TOP_Y + 1.78, 0]);
+    b.build(g, { cast: true });
+    this.idlers.build();
+    g.add(this.idlers.group);
+    // a blown finial on the cap
+    const finialGeo = blown(FORMS.gourd, { ribs: 10, ribDepth: 0.05, twist: 0.6, segments: 24 });
+    const finial = new THREE.Mesh(finialGeo, p.glass.amber);
+    finial.scale.setScalar(0.62);
+    finial.position.y = TOP_Y + 1.44;
     g.add(finial);
 
+    // --- the vessel
+    const profile: Array<[number, number]> = [];
+    for (let i = 0; i <= 44; i++) {
+      const y = BASE_Y + 0.02 + (i / 44) * (TOP_Y - BASE_Y - 0.02);
+      profile.push([vesselR(y), y]);
+    }
+    const vesselGeo = blown(profile, { rings: 56, segments: 64, ribs: 16, ribDepth: 0.008, twist: 1.5 });
+    const cheap = p.glassLike("opal", { tint: 0xfff3e2, glow: 0.42, opacity: 0.02, density: 0.42, irid: 0.3, repeat: [1, 2], side: THREE.FrontSide });
+    const glass = tiered(new THREE.Mesh(vesselGeo, cheap), cheap, () => {
+      const m = p.hero("opal", 0.14);
+      m.color.set(0xffffff);
+      m.attenuationColor.set(0xfff2dc);
+      m.attenuationDistance = 6;
+      m.emissiveIntensity = 0.05;
+      m.transmission = 0.96;
+      // the liquid's motes and the pour are drawn after the glass, inside it
+      m.depthWrite = false;
+      return m;
+    });
+    glass.renderOrder = 4;
+    glass.userData.lowOrder = 4;
+    g.add(glass);
+
+    // goal ring and its label, at the neck
+    const goalRing = ring(vesselR(GOAL_Y) + 0.16, GOAL_Y, 0.028, p.goldGlow);
+    g.add(goalRing);
+    const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.goalLabel.texture, transparent: true, depthWrite: false, toneMapped: false }));
+    gl.scale.set(1.3, 0.325, 1);
+    gl.position.set(0, GOAL_Y + 0.3, vesselR(GOAL_Y) + 0.34);
+    g.add(gl);
+
     // liquid
-    const sideGeo = new THREE.CylinderGeometry(RADIUS, RADIUS, 1, 72, 1, true);
+    const sideGeo = new THREE.CylinderGeometry(1, 1, 1, 72, 36, true);
     sideGeo.translate(0, 0.5, 0);
     const side = new THREE.Mesh(sideGeo, new THREE.ShaderMaterial({ vertexShader: SIDE_VERT, fragmentShader: SIDE_FRAG, uniforms: this.uniforms }));
     side.frustumCulled = false;
     g.add(side);
-    const surfGeo = new THREE.PlaneGeometry(RADIUS * 2, RADIUS * 2, 56, 56);
+    const surfGeo = new THREE.PlaneGeometry(RADIUS * 2.7, RADIUS * 2.7, 56, 56);
     surfGeo.rotateX(-Math.PI / 2);
     const surf = new THREE.Mesh(surfGeo, new THREE.ShaderMaterial({ vertexShader: SURF_VERT, fragmentShader: SURF_FRAG, uniforms: this.uniforms, side: THREE.DoubleSide }));
     surf.frustumCulled = false;
@@ -417,6 +424,7 @@ export class Reservoir {
 
   update(dt: number, t: number) {
     this.uniforms.uTime.value = t;
+    this.idlers.update(t);
     // the level rises faster while the pour runs
     this.level = easeLevel(this.level, this.targetLevel, dt, this.pourLeft > 0 ? 1.6 : 0.7);
     this.uniforms.uLevel.value = this.level;
@@ -445,7 +453,7 @@ export class Reservoir {
       this.splashAge += dt;
       const s = 0.2 + this.splashAge * 0.9;
       this.splash.visible = true;
-      this.splash.scale.setScalar(Math.min(s, RADIUS));
+      this.splash.scale.setScalar(Math.min(s, vesselR(this.level) - WALL - 0.03));
       this.splash.position.y = this.level + 0.04;
       (this.splash.material as THREE.MeshBasicMaterial).opacity = 1 - this.splashAge / 1.2;
     } else this.splash.visible = false;
@@ -454,7 +462,7 @@ export class Reservoir {
       const r = this.ripples[i];
       r.age += dt;
       r.m.position.y = this.level + 0.03;
-      r.m.scale.setScalar(Math.min(RADIUS, 0.1 + r.age * 0.8));
+      r.m.scale.setScalar(Math.min(vesselR(this.level) - WALL - 0.03, 0.1 + r.age * 0.8));
       (r.m.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.8 - r.age * 0.6);
       if (r.age > 1.3) {
         r.m.removeFromParent();
@@ -489,6 +497,12 @@ export class Reservoir {
     this.goalLabel.dispose();
     for (const f of this.floaters) f.label.dispose();
   }
+}
+
+function ringGeo(r: number, w: number) {
+  const g = new THREE.TorusGeometry(r, w, 8, 72);
+  g.rotateX(Math.PI / 2);
+  return g;
 }
 
 function ring(r: number, y: number, w: number, mat: THREE.Material) {

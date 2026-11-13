@@ -54,8 +54,8 @@ What each app function became in the world: `COVERAGE.md`.
 - `core/screens.ts`: diegetic DOM screens and docking. `core/interact.ts`: look-at interaction with an
   in-world hint. `core/player.ts`: movement, collision, first/third person. `core/collision.ts`: circles,
   rotated boxes, a round boundary. `core/input.ts`: keys, mouse, pointer lock. `core/quality.ts`.
-- `art/`: every texture is drawn on canvases in code (`textures.ts`), shared materials (`materials.ts`),
-  the Void sky, shards, motes and light shafts (`void.ts`), building blocks (`kit.ts`).
+- `art/`: the look. Everything is procedural (code-built geometry, canvas and shader textures), no
+  asset files. See "Art direction and the art kit" below.
 - `entities/figures.ts`: the player avatar and customer figures, built from primitives.
 - `rooms/vault/`: the first room (`index.ts` assembles it; `shell.ts` architecture; `reservoir.ts`;
   `customers.ts`).
@@ -100,8 +100,8 @@ The CSS3D layer sits under a transparent WebGL canvas. Each screen has a "hole" 
 rectangle that writes colour (0,0,0,0) and depth, so the DOM shows through only where nothing is in
 front of it: occlusion is per pixel and costs one quad. Glows use an additive blend that adds colour
 without touching alpha, so light spills over screens instead of covering them. On high quality the
-scene renders into a half-float target first; bloom and tone mapping run on a copy and the final pass
-takes alpha from the scene target (bloom alone never hides a screen). Screens that face away or are off
+scene renders into a half-float target first; depth of field, bloom and tone mapping run on a copy and
+the final pass takes alpha from the scene target (bloom alone never hides a screen). Screens that face away or are off
 view are `display: none`. Only the docked screen takes pointer events; the canvas never does.
 
 Rules learned the hard way: no `overflow: hidden` on the transformed `.vtg-screen` element (Chrome then
@@ -214,3 +214,64 @@ The classic app's notification sounds (`PlaySound` in `utils/helper.ts`, driven 
 event) are HTML audio elements outside this graph. While the game is mounted they are scaled by the
 in-world master volume and mute through `setAppSoundScale` (`utils/sound.ts`); on unmount the scale
 returns to 1. No Rust change.
+
+## Art direction and the art kit (stage 1B)
+
+A lived-in retro-futurist trading ship: warm, playful, 1970s space-pop. Candy enamel against deep
+space, worn brass (the old gold-and-void thread, now an accent), chrome, tufted leather, walnut,
+bakelite, analogue dials and tape reels, and as the signature material hand-blown art glass
+(latticino canes, millefiori murrine, dichroic film, seed bubbles). Everything is original: do not
+copy characters, ships, emblems, props or UI of any franchise.
+
+Files in `art/`:
+
+- `textures.ts`: plumbing (seeded noise, canvases, the glyph script, `CanvasLabel`).
+- `surfaces.ts`: canvas surfaces. `enamelPanel` (near white, chipped to primer and metal; the material
+  colour supplies the hue, so every enamel shares one map pair), `brassWorn`, `brassBand` (riveted
+  trim), `leatherTufted` (colour + rough/metal + normal map of pillows, stitches, buttons), `walnut`,
+  `instrumentFace` (dials, VU meter, lamps, switches, with an emissive map) and `INSTRUMENT_DIALS`
+  (where the needle meshes go), `tapeReel`, `loungeFloor` (the Vault's floor, drawn once, with the
+  room's light baked in), `loungeEnvironment` (the painted equirect), `wallShade`, and `CANDY`.
+- `glass.ts`: the glass. `glassPattern` (RGBA: rgb = canes, white where clear; a = density),
+  `cheapGlass` (one small shader: fresnel, a reflection of the painted environment sampled as an
+  equirect, thin film, the body lit from within; premultiplied, alpha stays honest so glass over a
+  DOM screen dims it), `heroGlass` (MeshPhysicalMaterial transmission / thickness / ior / dispersion
+  / iridescence), `tiered(mesh, low, makeHigh)` and `applyTier` (the engine swaps tiered meshes with
+  the quality; the high material is made on first use), `blown(profile, {ribs, twist})` and `FORMS`.
+- `materials.ts`: `Palette`, the shared materials. New names: `brass`, `brassDark`, `chrome`,
+  `leather`, `leatherTan`, `quilt`, `wood`, `bakelite`, `rubber`, `enamel[hue]` (panelled, world UVs),
+  `paint[hue]` (smooth), `glass[name]` (cheap glass per colour), `instrument`, `reel`, `needle`,
+  `warmGlow`, `wallShade`, `env`; `hero(name)` and `glassLike(name, overrides)`. The old names still
+  work as aliases: `gold` = brass, `goldDark`, `pearl` = cream enamel panel, `pearlPlain` = cream
+  paint, `ivory` = walnut, `steel` = bakelite, `filigree` = the brass band, `cyanGlow` (now teal),
+  `goldGlow`, `holo`, `floor`, `shadow`, `dot`, `undersuit`. Leather UVs are in metres x 2.5.
+- `kit.ts`: `Batch` (static dressing merged by material: `put(geo, mat, pos, rot, scale)`,
+  `at()/frame()` for sub-frames, `build(parent)` = one mesh per material; this is what keeps the
+  rooms inside the draw-call budget), `roundedBox`, `additive`, `archPath`, `gyroOrnament`.
+- `props.ts`: `Idlers` (all dial needles and tape reels of a room as two instanced meshes),
+  `instrumentCluster`, `reelUnit`, `banquette`, `brassRail`, `consoleBody`, `tradeCounter`,
+  `pedestal`, `boxM` (box with UVs in metres).
+- `fixtures.ts`: `chandelier` (brass corona, bell shades, opal globes, instanced pendants that sway),
+  `hangingLamp`, `sconce`, `lightPatches` (the coloured, caustic light glass throws on the floor: one
+  merged additive mesh), `haloMaterial`.
+- `env.ts`: `bakeEnvironment`: a small generated scene (the painting on a sphere plus HDR emitters
+  where the lamps and glass are) through PMREM. It is `scene.environment`: reflections for metal and
+  glass, and the ambient light (no hemisphere or fill lights; directional variation comes from it).
+- `post.ts`: the `DOF` and `FINISH` passes. `void.ts`: sky, rocks, planets, motes, light shafts.
+
+Lighting is faked cheaply and layered: the baked environment as ambient; one key spot and one warm
+point at the chandelier; baked light and occlusion in the floor canvases; `wallShade` strips over the
+walls (dark at the foot and under the cornice); contact shadow decals; additive halos behind sconces;
+a cove glow on the padded ceiling; `lightPatches` under every art-glass lunette; shafts and dust.
+
+Quality tiers. LOW: one pass to the canvas, no post, cheap glass everywhere, the ceiling's tufting
+painted only. HIGH: half-float MSAA target with a depth texture -> depth of field (only while docked:
+circle of confusion from each pixel's depth around the docked screen's plane; pixels with alpha 0,
+the screen holes, are never blurred or sampled and every pixel keeps its own alpha, so the DOM screen
+and its edge stay sharp) -> bloom (restrained) -> output -> finish (scene alpha back, vignette on the
+world only). Show glass (only the reservoir vessel and the chandelier's globes) uses
+transmission on HIGH, which costs three's extra scene pass; keep such meshes few.
+
+Rules: wall dressing stays under about 1.1 m (wainscot) or above 5.7 m (cornice) and shallower than
+12 cm, so terminals can go on any bay; put new static geometry through a `Batch`; give new glass a
+`tiered` pair only if it is a show piece; canvas textures at most 2048 and shared through the palette.
